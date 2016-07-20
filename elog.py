@@ -91,26 +91,23 @@ class Logbook(object):
 
             # Edit existing or post new?
             if msg_id:
-                msg_to_edit = self.__read_msg_from_server(msg_id)
+                msg_to_edit, attrib_to_edit, attach_to_edit = self.__read_msg_from_server(msg_id)
                 # Handle existing attachments
                 i = 0
-                for attachment in msg_to_edit["Attachment"]:
+                for attachment in attach_to_edit:
                     if attachment:
-                        msg_to_edit['attachment' + str(i)] = attachment
+                        # Existing attachments must be passed as regular arguments arrachment<i>
+                        # TODO New attachment differently
+                        attributes['attachment' + str(i)] = attachment
                         i += 1
 
-                print(msg_to_edit)
-
-                for attribute, data in msg_to_edit.items():
-                    # TODO handle Text, and **kwargs
-                    new_data = attributes.get(name)
+                # TODO handle **kwargs before this section
+                for attribute, data in attributes.items():
+                    new_data = attributes.get(attribute)
                     if not new_data is None:
-                        msg_to_edit[attribute] = new_data
-            else:
-                msg_to_edit = attributes
+                        attrib_to_edit[attribute] = new_data
 
-            print(msg_to_edit)
-            content, headers, boundary = self.__compose_msg(message, msg_to_edit, attachments)
+            content, headers, boundary = self.__compose_msg(message, attributes, attachments)
             content += self.__param_to_content('edit_id', str(msg_id), boundary)
             content += self.__param_to_content('skiplock', '1', boundary)
 
@@ -131,8 +128,21 @@ class Logbook(object):
         Reads message from the logbook server
         TODO docs
         '''
+        request_msg = urllib.parse.quote('/' + self.subdir + '/' + self.logbook + '/').replace('//', '/') +\
+                       str(msg_id) + '?cmd=download'
 
-        pass
+        headers =  self.__make_base_headers()
+
+        if self._user or self._password:
+            headers['Cookie'] = self.__make_user_and_pswd_cookie()
+
+
+        self.server.request('GET', request_msg, headers=headers)
+        returned_msg = self.server.getresponse().read()
+        # TODO check if something to be handled in headers of response
+
+        # returns: message, attributes, attachments
+        return(self.__parse_incoming_msg(returned_msg))
 
     def __compose_msg(self, message, attributes, attachments=list()):
         boundary = b'---------------------------1F9F2F8F3F7F' #TODO randomise boundary
@@ -216,30 +226,31 @@ class Logbook(object):
     ## Not jet
     def __parse_incoming_msg(self, msg):
         attributes = dict()
+        attachments = list()
 
         msg = msg.decode('utf-8').splitlines()
         delimeter_idx = msg.index('========================================')
 
-        attributes['Text'] = '\n'.join(msg[delimeter_idx+1:])
+        message = '\n'.join(msg[delimeter_idx+1:])
         for line in msg[0:delimeter_idx]:
             line = line.split(': ')
             data = ''.join(line[1:])
             if line[0] == 'Attachment':
-                data = data.split(',')
+                attachments = data.split(',')
+            else:
+                attributes[line[0]] = data
 
-            attributes[line[0]] = data
-
-        return(attributes)
+        return(message, attributes, attachments)
 
     def __remove_reserved_attributes(self, attributes):
         # Delete attributes that cannot be sent (reserved by elog)
         # TODO check if something to add to this list
         if attributes.get('$@MID@$'):
-            del msg['$@MID@$']
+            del attributes['$@MID@$']
         if attributes.get('Date'):
-            del msg['Date']
+            del attributes['Date']
         if attributes.get('Attachment'):
-            del msg['Attachment']
+            del attributes['Attachment']
 
     def __make_user_and_pswd_cookie(self):
         cookie=''
