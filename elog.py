@@ -2,8 +2,6 @@ import http.client
 import urllib.parse
 import ssl
 import os
-import copy
-from message import Message
 
 class Logbook(object):
     '''
@@ -27,29 +25,24 @@ class Logbook(object):
                             salt= '' and rounds=5000)
         :return:
         '''
-
-        self.hostname = hostname
-        self.subdir = subdir
         self.logbook = logbook
-
-        if port:
-            self.port = port
-        else:
-            if use_ssl:
-                self.port = 443
-            else:
-                self.port = 80
 
         self._user = user
         self._password= self.__handle_pswd(password, encrypt_pwd)
 
+        self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
+
+        if port:
+            url = hostname + ':' + str(port) + '/'
+        else:
+            url = hostname + '/'
+
         if use_ssl:
             self.server = http.client.HTTPSConnection(hostname, port=port, context=ssl.SSLContext(ssl.PROTOCOL_TLSv1))
+            self._url =  'http://' + url + self._logbook_path
         else:
             self.server = http.client.HTTPConnection(hostname, port=port)
-
-        self.content=''  # TODO whats this?
-
+            self._url =  'https://' + url + self._logbook_path
 
     def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain', **kwargs):
         '''
@@ -62,7 +55,6 @@ class Logbook(object):
             Attachment
         :param attachments: list of:
                                   - file like objects which read() will return bytes
-                                  - path to the file
 
                             If there is no attribute flo.name, it will be generated as attributeX.
                             All objects will be appended as attachment to the elog entry.
@@ -77,17 +69,10 @@ class Logbook(object):
         :return: Message()
         '''
 
-        # If it is message use its data to post
-
-        new_attributes = copy.copy(attributes)
-        new_attchments = copy.copy(attachments)
-
         if isinstance(message,Message):
-            # TODO
+            # TODO post data from object
             pass
         else:
-            #new_attributes = copy.copy(attributes)
-            #new_attchments = copy.copy(attachments)
 
             # Edit existing or post new?
             if msg_id:
@@ -96,8 +81,9 @@ class Logbook(object):
                 i = 0
                 for attachment in attach_to_edit:
                     if attachment:
-                        # Existing attachments must be passed as regular arguments arrachment<i>
-                        # TODO New attachment differently
+                        # When editing, existing attachments can be recognised since, they have following form:
+                        # <hostename>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
+                        # Existing attachments must be passed as regular arguments attachment<i>
                         attributes['attachment' + str(i)] = attachment
                         i += 1
 
@@ -120,6 +106,7 @@ class Logbook(object):
         :param msg_id: id of message to read from the logbook
         :return: Message()
         '''
+
         pass
 
 
@@ -128,21 +115,40 @@ class Logbook(object):
         Reads message from the logbook server
         TODO docs
         '''
-        request_msg = urllib.parse.quote('/' + self.subdir + '/' + self.logbook + '/').replace('//', '/') +\
-                       str(msg_id) + '?cmd=download'
+        # First build request, then parse response
+        request_msg = self._logbook_path +str(msg_id) + '?cmd=download'
 
-        headers =  self.__make_base_headers()
+        request_headers =  self.__make_base_headers()
 
         if self._user or self._password:
-            headers['Cookie'] = self.__make_user_and_pswd_cookie()
+            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
 
 
-        self.server.request('GET', request_msg, headers=headers)
-        returned_msg = self.server.getresponse().read()
-        # TODO check if something to be handled in headers of response
+        self.server.request('GET', request_msg, headers=request_headers)
+        response = self.server.getresponse()
+        # TODO error handling
 
-        # returns: message, attributes, attachments
-        return(self.__parse_incoming_msg(returned_msg))
+
+        # Parse message to separate message body, attributes and attachments
+        attributes = dict()
+        attachments = list()
+
+        returned_msg = response.read().decode('utf-8').splitlines()
+        delimeter_idx = returned_msg.index('========================================')
+
+        message = '\n'.join(returned_msg[delimeter_idx+1:])
+        for line in returned_msg[0:delimeter_idx]:
+            line = line.split(': ')
+            data = ''.join(line[1:])
+            if line[0] == 'Attachment':
+                attachments = data.split(',')
+                # Here are only attachment names, make a full url out of it, so they could be
+                # recognisable from others, and downloaded if needed
+                attachments = [self._url+'{0}'.format(i) for i in attachments]
+            else:
+                attributes[line[0]] = data
+
+        return(message, attributes, attachments)
 
     def __compose_msg(self, message, attributes, attachments=list()):
         boundary = b'---------------------------1F9F2F8F3F7F' #TODO randomise boundary
@@ -166,9 +172,8 @@ class Logbook(object):
         return(content, headers, boundary)
 
     def __send_msg(self, content, headers):
-        request_msg = urllib.parse.quote('/' + self.subdir + '/' + self.logbook + '/').replace('//', '/')
-        self.server.request('POST', request_msg , content, headers=headers)
-        response_ = self.server.getresponse()
+        self.server.request('POST', self._logbook_path , content, headers=headers)
+        response = self.server.getresponse()
 
     def __make_base_headers(self):
         header = dict()
@@ -209,38 +214,26 @@ class Logbook(object):
         content_ += newline_ + newline_ + data + b'\r\n' + newline_
         return(content_)
 
-    def __attachments_to_content(self, file_paths, boundary):
-        # TODO Fix this to take file like object!
+    def __attachments_to_content(self, files, boundary):
         content = b''
         i = 0
-        if file_paths:
-            for file_path in file_paths:
+        if files:
+            for file_obj in files:
                 i += 1
-                file = open(file_path, 'rb')
-                content += self.__param_to_content('attfile' + str(i), file.read(), boundary,
-                                                  filename=os.path.basename(file_path))
-                file.close()
+                attribute_name = 'attfile' + str(i)
+
+                filename = attribute_name  # default file name
+                try:
+                    candidate_filename = os.path.basename(file_obj.name)
+                    if filename: # use only if not empty string
+                        filename = candidate_filename
+                except AttributeError as e:
+                    print(e)
+
+
+                content += self.__param_to_content(attribute_name, file_obj.read(), boundary,ilename=filename)
 
         return(content)
-
-    ## Not jet
-    def __parse_incoming_msg(self, msg):
-        attributes = dict()
-        attachments = list()
-
-        msg = msg.decode('utf-8').splitlines()
-        delimeter_idx = msg.index('========================================')
-
-        message = '\n'.join(msg[delimeter_idx+1:])
-        for line in msg[0:delimeter_idx]:
-            line = line.split(': ')
-            data = ''.join(line[1:])
-            if line[0] == 'Attachment':
-                attachments = data.split(',')
-            else:
-                attributes[line[0]] = data
-
-        return(message, attributes, attachments)
 
     def __remove_reserved_attributes(self, attributes):
         # Delete attributes that cannot be sent (reserved by elog)
