@@ -148,6 +148,26 @@ class Logbook(object):
 
         return(message, attributes, attachments)
 
+    def delete_msg(self, msg_id):
+        '''
+        Deletes message from logbook. It also deletes all of the attachments.
+
+        :param msg_id: message to be deleted
+        :return:
+        '''
+        request_msg = self._logbook_path +str(msg_id) + '?cmd=Delete&confirm=Yes'
+        request_headers =  self.__make_base_headers()
+
+        if self._user or self._password:
+            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
+
+
+        self.server.request('GET', request_msg, headers=request_headers)
+        response = self.server.getresponse()
+        # TODO error handling
+
+
+
     def __compose_msg(self, message, attributes, attachments):
         boundary = b'---------------------------1F9F2F8F3F7F' #TODO randomise boundary
         headers = self.__make_base_headers()
