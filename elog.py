@@ -3,6 +3,7 @@ import urllib.parse
 import ssl
 import os
 import builtins
+import re
 
 class Logbook(object):
     '''
@@ -75,38 +76,40 @@ class Logbook(object):
 
         attachments = attachments or []
 
-        if msg_id and reply: # Reply to
-            attributes['reply_to'] = str(msg_id)
+        if msg_id:
+            # Verify that there is a message on the server, otherwise do not reply or reply to it!
+            self.__check_if_message_on_server(msg_id)  # raises exception in case of none existing message
+            # Message exists, we can continue
+            if reply: # Reply to
+                attributes['reply_to'] = str(msg_id)
 
-        elif msg_id: # Edit existing
-            attributes['edit_id'] = str(msg_id)
-            attributes['skiplock'] = '1'
+            else: # Edit existing
+                attributes['edit_id'] = str(msg_id)
+                attributes['skiplock'] = '1'
 
-            # Handle existing attachments
-            msg_to_edit, attrib_to_edit, attach_to_edit = self.read_msg(msg_id)
-            i = 0
-            for attachment in attach_to_edit:
-                if attachment:
-                    # Existing attachments must be passed as regular arguments attachment<i> with walue= file name
-                    # Read message returnes full urls to existing attachments:
-                    # <hostename>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
-                    attributes['attachment' + str(i)] = os.path.basename(attachment)
-                    i += 1
+                # Handle existing attachments
+                msg_to_edit, attrib_to_edit, attach_to_edit = self.read_msg(msg_id)
+                i = 0
+                for attachment in attach_to_edit:
+                    if attachment:
+                        # Existing attachments must be passed as regular arguments attachment<i> with walue= file name
+                        # Read message returnes full urls to existing attachments:
+                        # <hostename>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
+                        attributes['attachment' + str(i)] = os.path.basename(attachment)
+                        i += 1
 
-            for attribute, data in attributes.items():
-                new_data = attributes.get(attribute)
-                if not new_data is None:
-                    attrib_to_edit[attribute] = new_data
+                for attribute, data in attributes.items():
+                    new_data = attributes.get(attribute)
+                    if not new_data is None:
+                        attrib_to_edit[attribute] = new_data
 
         content, headers, boundary = self.__compose_msg(message, attributes, attachments)
-        response = self.__send_msg(content, headers)
+        response, headers, stauts, resp_msg_id = self.__validate_response(self.__send_msg(content, headers))
 
-        for header in response.getheaders():
-            if header[0] == 'Location':
-                # Successfully posted. Get and return msg_id from response
-                return(int(header[1].split('/')[-1]))
-            #else:
-                # else Todo raise custom exception
+        # Any error before here should raise an exception, but check again for nay case.
+        if not resp_msg_id or resp_msg_id < 1:
+            raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
+        return(resp_msg_id)
 
     def read_msg(self, msg_id):
         '''
@@ -118,25 +121,29 @@ class Logbook(object):
         :param msg_id: ID of the message to be read
         :return: message, attributes, attachments
         '''
-        # First build request, then parse response
+
         request_msg = self._logbook_path +str(msg_id) + '?cmd=download'
 
         request_headers =  self.__make_base_headers()
-
         if self._user or self._password:
             request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
 
+        try:
+            self.server.request('GET', request_msg, headers=request_headers)
+            # Validate response. If problems Exception will be thrown.
+            resp_message, resp_headers, resp_status, resp_msg_id =  self.__validate_response( self.server.getresponse())
 
-        self.server.request('GET', request_msg, headers=request_headers)
-        response = self.server.getresponse()
-        # TODO error handling
-
+        except http.client.RemoteDisconnected as e:
+            # This means there were no response on download command. Check if message on server.
+            self.__check_if_message_on_server(msg_id) # raises exceptions when missing message or no response from server
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to read the message with ID: ' + str(msg_id))
 
         # Parse message to separate message body, attributes and attachments
         attributes = dict()
         attachments = list()
 
-        returned_msg = response.read().decode('utf-8').splitlines()
+        returned_msg = resp_message.decode('utf-8').splitlines()
         delimeter_idx = returned_msg.index('========================================')
 
         message = '\n'.join(returned_msg[delimeter_idx+1:])
@@ -153,9 +160,10 @@ class Logbook(object):
 
         return(message, attributes, attachments)
 
-    def delete_msg(self, msg_id):
+    def delete_msg_thread(self, msg_id):
         '''
-        Deletes message from logbook. It also deletes all of its attachments from the server.
+        Deletes message thread (!!!message + all replies!!!) from logbook.
+        It also deletes all of attachments of corresponding messages from the server.
 
         :param msg_id: message to be deleted
         :return:
@@ -166,11 +174,35 @@ class Logbook(object):
         if self._user or self._password:
             request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
 
+        try:
+            self.server.request('GET', request_msg, headers=request_headers)
+            self.__validate_response(self.server.getresponse())
+        except http.client.RemoteDisconnected as e:
+            # This means there were no response on download command. Check if message on server.
+            self.__check_if_message_on_server(msg_id) # raises exceptions when missing message or no response from server
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to delete the message with ID: ' + str(msg_id))
 
-        self.server.request('GET', request_msg, headers=request_headers)
-        response = self.server.getresponse()
-        # TODO error handling
+    def __check_if_message_on_server(self, msg_id):
+        '''Try to load page for specific message. If there is text 'This entry has been deleted' on the page,
+        message has been deleted or not yet created.
 
+        :param msg_id: ID of message to be checked
+        :return:
+        '''
+        request_msg = self._logbook_path +str(msg_id)
+        request_headers =  self.__make_base_headers()
+        if self._user or self._password:
+            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
+        try:
+            self.server.request('GET', request_msg, headers=request_headers)
+            # Validate response. If problems Exception will be thrown.
+            resp_message, resp_headers, resp_status, resp_msg_id =  self.__validate_response(self.server.getresponse())
+            if 'This entry has been deleted' in resp_message.decode('utf-8'):
+                raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
+
+        except http.client.RemoteDisconnected:
+            raise LogbookServerProblem('No response from the logbook server.')
 
 
     def __compose_msg(self, message, attributes, attachments):
@@ -314,15 +346,15 @@ class Logbook(object):
                     attribute_name = 'attfile' + str(i)
 
                     file_obj = builtins.open(file_obj, 'rb')
-                    print(file_obj)
+
                     content += self.__param_to_content(attribute_name, file_obj.read(), boundary,
                                                        filename=file_obj.name)
 
                 elif not file_obj.startswith(self._url):
-                    raise TypeError('Invalid type of attachment: \"' + file_obj + '\".')
+                    raise LogbookInvalidAttachmentType('Invalid type of attachment: \"' + file_obj + '\".')
             else:
-                raise TypeError('Invalid type of attachment[' + str(i) + '].')
-        # Todo type errors replace
+                raise LogbookInvalidAttachmentType('Invalid type of attachment[' + str(i) + '].')
+
         return(content)
 
     def __remove_reserved_attributes(self, attributes):
@@ -339,9 +371,6 @@ class Logbook(object):
             attributes.pop('Attachment', None)
             attributes.pop('Text', None)
             attributes.pop('Encoding', None)
-            attributes.pop('Locked by', None)
-            attributes.pop('In reply to', None)
-            attributes.pop('Reply to', None)
 
     def __make_user_and_pswd_cookie(self):
         '''
@@ -355,6 +384,47 @@ class Logbook(object):
             cookie += 'upwd=' + self._password + ';'
 
         return(cookie)
+
+    def __get_response(self):
+        '''
+        Tries to get response. If no response raises an error.
+        :return:
+        '''
+
+    def __validate_response(self, response):
+        ''' validate response on the request'''
+        response_msg = response.read()
+        response_headers = response.getheaders()
+
+        msg_id = None
+
+        if not response.status in [200, 302]:
+            # 200 --> OK; 302 --> Found
+            # Html page is returned with error description (handling errors same way as on original client. Looks
+            # like there is no other way.
+
+            err = re.findall('Error:.*?</td>', response_msg.decode('utf-8'), flags=re.DOTALL)
+
+            if len(err) > 0:
+                # Remove html tags
+                # If part of the message has: Please go  back... remove this part since it is an instruction for
+                # the user when using browser.
+                err = re.sub('(?:<.*?>|Please go back.*)','', err[0])
+                if err:
+                    raise LogbookMessageRejected('Rejected because of: ' + err)
+            # Other unknown errors
+            raise LogbookMessageRejected('Rejected because of unknown error')
+        else:
+            for header in response_headers:
+                if header[0] == 'Location':
+                    if 'has moved' in header[1]:
+                        raise LogbookServerProblem('Logbook server has moved to another location.')
+                    elif 'fail' in header[1]:
+                        raise LogbookAuthenticationError('Invalid username or password.')
+                    else:
+                        msg_id = int(header[1].split('/')[-1])
+
+        return(response_msg, response_headers, response.status, msg_id)
 
     def __handle_pswd(self, password, encrypt=True):
         '''
@@ -373,6 +443,36 @@ class Logbook(object):
             return(password[4:])
         else:
             return(password)
+
+
+class LogbookError(Exception):
+    ''' Parent logbook exception.'''
+    pass
+
+
+class LogbookAuthenticationError(LogbookError):
+    ''' Raise when problem with username and password.'''
+    pass
+
+
+class LogbookServerProblem(LogbookError):
+    ''' Raise when problem accessing logbook server.'''
+    pass
+
+
+class LogbookMessageRejected(LogbookError):
+    ''' Raised when manipulating/creating message was rejected by the server or there was problem composing message.'''
+    pass
+
+
+class LogbookInvalidMessageID(LogbookMessageRejected):
+    ''' Raised when there is no message with specified ID on the server.'''
+    pass
+
+
+class LogbookInvalidAttachmentType(LogbookMessageRejected):
+    ''' Raised when passed attachment has invalid type.'''
+    pass
 
 def open(*args, **kwargs):
     '''
