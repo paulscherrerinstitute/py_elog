@@ -1,5 +1,6 @@
 import requests
 import urllib.parse
+import ssl
 import os
 import builtins
 import re
@@ -125,7 +126,8 @@ class Logbook(object):
         # Base attributes are common to all messages
         self.__add_base_msg_attributes(attributes_to_edit)
 
-        response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False)
+        response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
+                                 verify = False)
         message, headers, resp_msg_id = self.__validate_response(response)
 
         # Any error before here should raise an exception, but check again for nay case.
@@ -199,7 +201,7 @@ class Logbook(object):
 
         try:
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
-                                    allow_redirects=False)
+                                    allow_redirects=False, verify=False)
             self.__validate_response(response)
         except requests.RequestException as e:
             # This means there were no response on download command. Check if message on server.
@@ -221,7 +223,8 @@ class Logbook(object):
         if self._user or self._password:
             request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
         try:
-            response = requests.get(self._url + str(msg_id), headers=request_headers, allow_redirects=False)
+            response = requests.get(self._url + str(msg_id), headers=request_headers, allow_redirects=False,
+                                    verify=False)
             # Validate response. If problems Exception will be thrown.
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
             if b'This entry has been deleted' in resp_message:
