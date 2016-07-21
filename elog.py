@@ -27,7 +27,6 @@ class Logbook(object):
         :return:
         '''
         self.logbook = logbook
-
         self._user = user
         self._password= self.__handle_pswd(password, encrypt_pwd)
 
@@ -63,7 +62,8 @@ class Logbook(object):
                                   - paths to the files
                             All items will be appended as attachment to the elog entry. In case of unknown
                             attachment an exception LogbookInvalidAttachment will be raised.
-        :param encoding: can be: 'plain' -> plain text, 'html'->html-text, 'ELCode' --> elog formatting syntax
+        :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
+                         'ELCode' --> elog formatting syntax
         :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post_msg('Test text',
                        Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
                        attributes defined in "attributes", kwargs will have priority.
@@ -76,11 +76,17 @@ class Logbook(object):
 
         attachments = attachments or []
 
+        if encoding not in ['plain', 'HTML', 'ELCode']:
+            raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
+
+        attributes['encoding'] = encoding
+
         if msg_id:
             # Verify that there is a message on the server, otherwise do not reply or reply to it!
             self.__check_if_message_on_server(msg_id)  # raises exception in case of none existing message
+
             # Message exists, we can continue
-            if reply: # Reply to
+            if reply:
                 attributes['reply_to'] = str(msg_id)
 
             else: # Edit existing
@@ -135,7 +141,7 @@ class Logbook(object):
 
         except http.client.RemoteDisconnected as e:
             # This means there were no response on download command. Check if message on server.
-            self.__check_if_message_on_server(msg_id) # raises exceptions when missing message or no response from server
+            self.__check_if_message_on_server(msg_id) # raises exceptions if no message or no response from server
             # If here: message is on server but cannot be downloaded (should never happen)
             raise LogbookServerProblem('Cannot access logbook server to read the message with ID: ' + str(msg_id))
 
