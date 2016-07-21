@@ -143,7 +143,7 @@ class Logbook(object):
         attributes = dict()
         attachments = list()
 
-        returned_msg = resp_message.decode('utf-8').splitlines()
+        returned_msg = resp_message.splitlines()
         delimeter_idx = returned_msg.index('========================================')
 
         message = '\n'.join(returned_msg[delimeter_idx+1:])
@@ -198,7 +198,7 @@ class Logbook(object):
             self.server.request('GET', request_msg, headers=request_headers)
             # Validate response. If problems Exception will be thrown.
             resp_message, resp_headers, resp_status, resp_msg_id =  self.__validate_response(self.server.getresponse())
-            if 'This entry has been deleted' in resp_message.decode('utf-8'):
+            if 'This entry has been deleted' in resp_message:
                 raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
 
         except http.client.RemoteDisconnected:
@@ -392,8 +392,9 @@ class Logbook(object):
         '''
 
     def __validate_response(self, response):
-        ''' validate response on the request'''
-        response_msg = response.read()
+        ''' Validate response of the request.'''
+
+        response_msg = response.read().decode('utf-8')
         response_headers = response.getheaders()
 
         msg_id = None
@@ -403,7 +404,7 @@ class Logbook(object):
             # Html page is returned with error description (handling errors same way as on original client. Looks
             # like there is no other way.
 
-            err = re.findall('Error:.*?</td>', response_msg.decode('utf-8'), flags=re.DOTALL)
+            err = re.findall('Error:.*?</td>', response_msg, flags=re.DOTALL)
 
             if len(err) > 0:
                 # Remove html tags
@@ -423,6 +424,11 @@ class Logbook(object):
                         raise LogbookAuthenticationError('Invalid username or password.')
                     else:
                         msg_id = int(header[1].split('/')[-1])
+
+                if 'form name=form1' in response_msg or 'enter password' in response_msg:
+                    # Not to smart to check this way, but no other indication of this kind of error.
+                    # C client does it the same way
+                    raise LogbookAuthenticationError('Invalid username or password.')
 
         return(response_msg, response_headers, response.status, msg_id)
 
