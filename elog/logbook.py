@@ -81,7 +81,7 @@ class Logbook(object):
             raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
 
         attributes['encoding'] = encoding
-
+        attributes_to_edit = dict()
         if msg_id:
             # Message exists, we can continue
             if reply:
@@ -111,8 +111,10 @@ class Logbook(object):
                     if new_data is not None:
                         attributes_to_edit[attribute] = new_data
 
-                # Remove any attributes that should not be sent
-                self.__remove_reserved_attributes(attributes_to_edit)
+        if not attributes_to_edit:
+            attributes_to_edit = attributes
+        # Remove any attributes that should not be sent
+        self.__remove_reserved_attributes(attributes_to_edit)
 
         if attachments:
             files_to_attach = self.__prepare_attachments(attachments)
@@ -126,9 +128,18 @@ class Logbook(object):
         # Base attributes are common to all messages
         self.__add_base_msg_attributes(attributes_to_edit)
 
-        response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
+        try:
+            response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
                                  verify = False)
-        message, headers, resp_msg_id = self.__validate_response(response)
+            # Validate response. Any problems will raise an Exception.
+            resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
+        except requests.RequestException as e:
+            # This means there were no response on download command. Check if message on server.
+            self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
+
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to post a message, ' + 'because of:\n' +
+                                       '{0}'.format(e))
 
         # Any error before here should raise an exception, but check again for nay case.
         if not resp_msg_id or resp_msg_id < 1:
@@ -151,6 +162,7 @@ class Logbook(object):
             request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
 
         try:
+            self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
             response = requests.get(self._url + str(msg_id) + '?cmd=download', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
@@ -158,9 +170,6 @@ class Logbook(object):
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
 
         except requests.RequestException as e:
-            # This means there were no response on download command. Check if message on server.
-            self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
-
             # If here: message is on server but cannot be downloaded (should never happen)
             raise LogbookServerProblem('Cannot access logbook server to read the message with ID: ' + str(msg_id) +
                                        'because of:\n' + '{0}'.format(e))
@@ -330,7 +339,7 @@ class Logbook(object):
             # Html page is returned with error description (handling errors same way as on original client. Looks
             # like there is no other way.
 
-            err = re.findall('Error:.*?</td>', response.content, flags=re.DOTALL)
+            err = re.findall('Error:.*?</td>', response.content.decode('utf-8'), flags=re.DOTALL)
 
             if len(err) > 0:
                 # Remove html tags

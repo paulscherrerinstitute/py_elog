@@ -1,0 +1,15 @@
+package:
+    name: elog
+    version: 0.9.0
+source:
+    path: ..
+
+requirements:
+    build:
+        - setuptools
+        - python
+        - passlib
+
+about:
+    home: https://git.psi.ch/cosylab/CameraTool
+    summary: "BeamDynamics camera acquisition and processing tool"
