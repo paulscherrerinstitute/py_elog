@@ -1,9 +1,9 @@
 import requests
 import urllib.parse
-import ssl
 import os
 import builtins
 import re
+from elog.logbook_exceptions import *
 
 
 class Logbook(object):
@@ -375,43 +375,3 @@ class Logbook(object):
             return(password[4:])
         else:
             return(password)
-
-
-class LogbookError(Exception):
-    """ Parent logbook exception."""
-    pass
-
-
-class LogbookAuthenticationError(LogbookError):
-    """ Raise when problem with username and password."""
-    pass
-
-
-class LogbookServerProblem(LogbookError):
-    """ Raise when problem accessing logbook server."""
-    pass
-
-
-class LogbookMessageRejected(LogbookError):
-    """ Raised when manipulating/creating message was rejected by the server or there was problem composing message."""
-    pass
-
-
-class LogbookInvalidMessageID(LogbookMessageRejected):
-    """ Raised when there is no message with specified ID on the server."""
-    pass
-
-
-class LogbookInvalidAttachmentType(LogbookMessageRejected):
-    """ Raised when passed attachment has invalid type."""
-    pass
-
-
-def open(*args, **kwargs):
-    """
-    Will return a Logbook object. All arguments are passed to the logbook constructor.
-    :param args:
-    :param kwargs:
-    :return: Logbook() instance
-    """
-    return(Logbook(*args, **kwargs))
