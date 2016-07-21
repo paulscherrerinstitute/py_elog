@@ -33,18 +33,19 @@ class Logbook(object):
         self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
 
         if port:
-            url = hostname + ':' + str(port) + '/'
+            url = hostname + ':' + str(port)
         else:
-            url = hostname + '/'
+            url = hostname
 
         if use_ssl:
             self.server = http.client.HTTPSConnection(hostname, port=port, context=ssl.SSLContext(ssl.PROTOCOL_TLSv1))
-            self._url =  'http://' + url + self._logbook_path
+            self._url =  'https://' + url + self._logbook_path
         else:
             self.server = http.client.HTTPConnection(hostname, port=port)
-            self._url =  'https://' + url + self._logbook_path
+            self._url =  'http://' + url + self._logbook_path
 
-    def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain', **kwargs):
+    def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
+                 **kwargs):
         '''
 
         :param message: string with message text or an existing Message()
@@ -66,51 +67,48 @@ class Logbook(object):
 
         Error handling with exceptions
 
-        :return: Message()
+        :return: msg_id
         '''
 
-        if isinstance(message,Message):
-            # TODO post data from object
-            pass
-        else:
+        attributes = attributes or {}
+        attributes = {**attributes, **kwargs} # kwargs as attributes with higher priority
 
-            # Edit existing or post new?
-            if msg_id:
-                msg_to_edit, attrib_to_edit, attach_to_edit = self.__read_msg_from_server(msg_id)
-                # Handle existing attachments
-                i = 0
-                for attachment in attach_to_edit:
-                    if attachment:
-                        # When editing, existing attachments can be recognised since, they have following form:
-                        # <hostename>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
-                        # Existing attachments must be passed as regular arguments attachment<i>
-                        attributes['attachment' + str(i)] = attachment
-                        i += 1
+        attachments = attachments or []
 
-                # TODO handle **kwargs before this section
-                for attribute, data in attributes.items():
-                    new_data = attributes.get(attribute)
-                    if not new_data is None:
-                        attrib_to_edit[attribute] = new_data
+        if msg_id and reply: # Reply to
+            attributes['reply_to'] = str(msg_id)
 
-            content, headers, boundary = self.__compose_msg(message, attributes, attachments)
-            content += self.__param_to_content('edit_id', str(msg_id), boundary)
-            content += self.__param_to_content('skiplock', '1', boundary)
+        elif msg_id: # Edit existing
+            attributes['edit_id'] = str(msg_id)
+            attributes['skiplock'] = '1'
 
-        self.__send_msg(content, headers)
+            # Handle existing attachments
+            msg_to_edit, attrib_to_edit, attach_to_edit = self.read_msg(msg_id)
+            i = 0
+            for attachment in attach_to_edit:
+                if attachment:
+                    # Existing attachments must be passed as regular arguments attachment<i> with walue= file name
+                    # Read message returnes full urls to existing attachments:
+                    # <hostename>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
+                    attributes['attachment' + str(i)] = os.path.basename(attachment)
+                    i += 1
 
+            for attribute, data in attributes.items():
+                new_data = attributes.get(attribute)
+                if not new_data is None:
+                    attrib_to_edit[attribute] = new_data
+
+        content, headers, boundary = self.__compose_msg(message, attributes, attachments)
+        response = self.__send_msg(content, headers)
+
+        for header in response.getheaders():
+            if header[0] == 'Location':
+                # Successfully posted. Get and return msg_id from response
+                return(int(header[1].split('/')[-1]))
+            #else:
+                # else Todo raise custom exception
 
     def read_msg(self, msg_id):
-        '''
-        Reads message from the logbook
-        :param msg_id: id of message to read from the logbook
-        :return: Message()
-        '''
-
-        pass
-
-
-    def __read_msg_from_server(self, msg_id):
         '''
         Reads message from the logbook server
         TODO docs
@@ -143,14 +141,14 @@ class Logbook(object):
             if line[0] == 'Attachment':
                 attachments = data.split(',')
                 # Here are only attachment names, make a full url out of it, so they could be
-                # recognisable from others, and downloaded if needed
-                attachments = [self._url+'{0}'.format(i) for i in attachments]
+                # recognisable by others, and downloaded if needed
+                attachments = [self._url+ '{0}'.format(i) for i in attachments]
             else:
                 attributes[line[0]] = data
 
         return(message, attributes, attachments)
 
-    def __compose_msg(self, message, attributes, attachments=list()):
+    def __compose_msg(self, message, attributes, attachments):
         boundary = b'---------------------------1F9F2F8F3F7F' #TODO randomise boundary
         headers = self.__make_base_headers()
         content = self.__make_base_msg_content(boundary)
@@ -160,20 +158,23 @@ class Logbook(object):
 
         # Add main message, then append attributes and add attachments
         content += self.__param_to_content ('Text', message, boundary)
+        if attributes:
+            for name, data in attributes.items():
+                content += self.__param_to_content (name, data, boundary)
 
-        for name, data in attributes.items():
-            content += self.__param_to_content (name, data, boundary)
+        if attachments:
+            content += self.__attachments_to_content(attachments, boundary)
 
-        content += self.__attachments_to_content(attachments, boundary)
-
-        #TODO check what is with this content
+        content += boundary
+        # from __make_base_header set Content-Type: multipart/form-data
         headers['Content-Type'] += '; boundary=' + boundary.decode('utf-8')
-
         return(content, headers, boundary)
 
     def __send_msg(self, content, headers):
         self.server.request('POST', self._logbook_path , content, headers=headers)
         response = self.server.getresponse()
+
+        return(response)
 
     def __make_base_headers(self):
         header = dict()
@@ -193,57 +194,61 @@ class Logbook(object):
         return(content)
 
     def __param_to_content (self, name, data, boundary, **kwargs):
-        content_ =b''
-        newline_= b'\r\n'
+        content =b''
+        newline= b'\r\n'
 
         if isinstance(name, str):
-            name=name.encode('utf-8')
+            name = name.encode('utf-8')
 
         if isinstance(data, str):
-            data=data.encode('utf-8')
+            data = data.encode('utf-8')
 
-        content_ += boundary + newline_+  b'Content-Disposition: form-data; name=\"' + name + b'\"'
+        content += boundary + newline +  b'Content-Disposition: form-data; name=\"' + name + b'\"'
 
         if kwargs:
             for key_, value_ in kwargs.items():
-                content_ += b'; ' + key_.encode('utf-8') + b'=\"' + value_.encode('utf-8') + b'\"'
+                content += b'; ' + key_.encode('utf-8') + b'=\"' + value_.encode('utf-8') + b'\"'
 
         if isinstance(data, str):
-            data=data.encode('utf-8')
+            data = data.encode('utf-8')
 
-        content_ += newline_ + newline_ + data + b'\r\n' + newline_
-        return(content_)
+        content += newline + newline + data + b'\r\n' + newline
+
+        return(content)
 
     def __attachments_to_content(self, files, boundary):
         content = b''
         i = 0
-        if files:
-            for file_obj in files:
+        for file_obj in files:
+            if hasattr(file_obj, 'read'):
                 i += 1
                 attribute_name = 'attfile' + str(i)
 
-                filename = attribute_name  # default file name
-                try:
-                    candidate_filename = os.path.basename(file_obj.name)
-                    if filename: # use only if not empty string
-                        filename = candidate_filename
-                except AttributeError as e:
-                    print(e)
+                filename = attribute_name  # If file like object has no name specified use this one
+                candidate_filename = os.path.basename(file_obj.name)
 
+                if filename: # use only if not empty string
+                    filename = candidate_filename
 
-                content += self.__param_to_content(attribute_name, file_obj.read(), boundary,ilename=filename)
+                content += self.__param_to_content(attribute_name, file_obj.read(), boundary, filename=filename)
+
+            else:
+                raise TypeError('Attachment[' + str(i) + '] is not a file like object. Cannot be read.')
 
         return(content)
 
     def __remove_reserved_attributes(self, attributes):
         # Delete attributes that cannot be sent (reserved by elog)
-        # TODO check if something to add to this list
-        if attributes.get('$@MID@$'):
-            del attributes['$@MID@$']
-        if attributes.get('Date'):
-            del attributes['Date']
-        if attributes.get('Attachment'):
-            del attributes['Attachment']
+
+        if attributes:
+            attributes.get('$@MID@$', None)
+            attributes.pop('Date', None)
+            attributes.pop('Attachment', None)
+            attributes.pop('Text', None)
+            attributes.pop('Encoding', None)
+            attributes.pop('Locked by', None)
+            attributes.pop('In reply to', None)
+            attributes.pop('Reply to', None)
 
     def __make_user_and_pswd_cookie(self):
         cookie=''
