@@ -276,3 +276,6 @@ class Logbook(object):
             return(password[4:])
         else:
             return(password)
+
+def open(*args, **kwargs):
+    return(Logbook(*args, **kwargs))
