@@ -2,13 +2,12 @@ import http.client
 import urllib.parse
 import ssl
 import os
+import builtins
 
 class Logbook(object):
     '''
-    Logbook: server:port/subdir/logbook
-
-    Logbook object holds a list of existing Message() instances. If post_msg is called and message with msg_id
-    already exists it will be updated and returned.
+    Logbook provides methods to interface with logbook on location: "server:port/subdir/logbook". User can create,
+    edit, delete logbook messages.
     '''
     def __init__(self, hostname, logbook, port=None, user=None, password=None, subdir='', use_ssl=True,
                  encrypt_pwd=True):
@@ -17,11 +16,12 @@ class Logbook(object):
         :param logbook: name of the logbook on the elog server
         :param port: elog server port (if not specified will default to '80' if use_ssl=False or '443' if use_ssl=True
         :param user: username (if authentication needed)
-        :param password: password (if authentication needed)
+        :param password: password (if authentication needed) Password will be encrypted with sha256 unless
+                         encrypt_pwd=False (default: True)
         :param subdir: subdirectory of logbooks locations
         :param use_ssl: connect using ssl?
         :param encrypt_pwd: To avoid exposing password in the code, this flag can be set to False and password
-                            will be then handled as it is (user needs to provide sha256 encrypted password with
+                            will then be handled as it is (user needs to provide sha256 encrypted password with
                             salt= '' and rounds=5000)
         :return:
         '''
@@ -47,25 +47,25 @@ class Logbook(object):
     def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
                  **kwargs):
         '''
+        Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
+        message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
+        of the newly created message.
 
-        :param message: string with message text or an existing Message()
-        :msg_id: Id of message to edit or reply. If not specified new message is created
-        :reply: Do reply on existing message (new is created). Else edit existing.
-        :param attributes: dictionary of attributes !! Following attributes name are not valid and will be ignored
-            because they are used internally by the elog: Text, Date, Encoding, Reply to, In reply to, Locked by,
-            Attachment
+        :param message: string with message text
+        :msg_id: ID number of message to edit or reply. If not specified new message is created.
+        :reply: If 'True' reply to existing message is created instead of editing it
+        :param attributes: Dictionary of attributes. Following attributes are used internally by the elog and will be
+                           ignored: Text, Date, Encoding, Reply to, In reply to, Locked by, Attachment
         :param attachments: list of:
-                                  - file like objects which read() will return bytes
-
-                            If there is no attribute flo.name, it will be generated as attributeX.
-                            All objects will be appended as attachment to the elog entry.
+                                  - file like objects which read() will return bytes (if file_like_object.name is not
+                                    defined, default name "attachmet<i>" will be used.
+                                  - paths to the files
+                            All items will be appended as attachment to the elog entry. In case of unknown
+                            attachment an exception LogbookInvalidAttachment will be raised.
         :param encoding: can be: 'plain' -> plain text, 'html'->html-text, 'ELCode' --> elog formatting syntax
-        :param kwargs: Since there are basically no mandatory fields for logbook(totally depends on the
-                       specific logbook configurations) anything in the kwargs will be interpreted as attributes.
-                       e.g.: Elog.post_msg('Test text', Author='Rok Vintar), "Author" will be sent as an attribute
-                       If named same as one of the attributes defined in "attributes", kwargs will have priority.
-
-        Error handling with exceptions
+        :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post_msg('Test text',
+                       Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
+                       attributes defined in "attributes", kwargs will have priority.
 
         :return: msg_id
         '''
@@ -110,8 +110,13 @@ class Logbook(object):
 
     def read_msg(self, msg_id):
         '''
-        Reads message from the logbook server
-        TODO docs
+        Reads message from the logbook server and returns tuple of (message, attributes, attachments) where:
+        message: string with message body
+        attributes: dictionary of all attributes returned by the logbook
+        attachments: list of urls to attachments on the logbook server
+
+        :param msg_id: ID of the message to be read
+        :return: message, attributes, attachments
         '''
         # First build request, then parse response
         request_msg = self._logbook_path +str(msg_id) + '?cmd=download'
@@ -150,7 +155,7 @@ class Logbook(object):
 
     def delete_msg(self, msg_id):
         '''
-        Deletes message from logbook. It also deletes all of the attachments.
+        Deletes message from logbook. It also deletes all of its attachments from the server.
 
         :param msg_id: message to be deleted
         :return:
@@ -169,6 +174,13 @@ class Logbook(object):
 
 
     def __compose_msg(self, message, attributes, attachments):
+        '''
+        Prepares all message components to be sent with http.
+        :param message: message body
+        :param attributes: message attributes
+        :param attachments: message attachments
+        :return: content, headers, boudnary
+        '''
         boundary = b'---------------------------1F9F2F8F3F7F' #TODO randomise boundary
         headers = self.__make_base_headers()
         content = self.__make_base_msg_content(boundary)
@@ -191,12 +203,22 @@ class Logbook(object):
         return(content, headers, boundary)
 
     def __send_msg(self, content, headers):
+        '''
+        Sends HTTP content and headers (prepared with __compose_msg) to the logbook server and returns response
+        :param content: http content
+        :param headers: http headers
+        :return: response from the server
+        '''
         self.server.request('POST', self._logbook_path , content, headers=headers)
         response = self.server.getresponse()
 
         return(response)
 
     def __make_base_headers(self):
+        '''
+        Creates base headers, which should be used by all messages.
+        :return: dictionary of headers
+        '''
         header = dict()
         header['User-Agent'] = 'ELOG'
         header['Content-Type'] = 'multipart/form-data'
@@ -204,6 +226,11 @@ class Logbook(object):
         return(header)
 
     def __make_base_msg_content(self, boundary):
+        '''
+        Create base message content which is used by all messages.
+        :param boundary: decimeter between Content-Disposition
+        :return: content string
+        '''
         content = self.__param_to_content('cmd', 'Submit', boundary)
         content += self.__param_to_content('exp', self.logbook, boundary)
         if self._user:
@@ -214,6 +241,18 @@ class Logbook(object):
         return(content)
 
     def __param_to_content (self, name, data, boundary, **kwargs):
+        '''
+        Parses parameter name and data to content format:
+            Content-Disposition: form-data; name='name'; kwarg0 = 'kwargs[0]'; ....
+
+            data
+
+        :param name: name of the content (usually attribute name in case of elog)
+        :param data: value of the attribute (or file content for example)
+        :param boundary: decimeter between Content-Disposition
+        :param kwargs: optional parameters after name=''
+        :return: content string
+        '''
         content =b''
         newline= b'\r\n'
 
@@ -237,6 +276,19 @@ class Logbook(object):
         return(content)
 
     def __attachments_to_content(self, files, boundary):
+        '''
+        Parses attachments to content objects. Attachments can be:
+            - file like objects: must have method read() which returns bytes. If it has attribute .name it will be used
+              for attachment name, otherwise generic attribute<i> name will be used.
+            - path to the file on disk
+
+        Note that if attachment is is an url pointing to the existing Logbook server it will be ignored and no
+        exceptions will be raised. This can happen if attachments returned with read_method are resend.
+
+        :param files: list of file like objects or paths
+        :param boundary: decimeter between Content-Disposition
+        :return: content string
+        '''
         content = b''
         i = 0
         for file_obj in files:
@@ -252,13 +304,34 @@ class Logbook(object):
 
                 content += self.__param_to_content(attribute_name, file_obj.read(), boundary, filename=filename)
 
-            else:
-                raise TypeError('Attachment[' + str(i) + '] is not a file like object. Cannot be read.')
+            elif isinstance(file_obj, str):
+                # Check if it is:
+                #           - a path to the file --> open file and append
+                #           - an url pointing to the existing Logbook server --> ignore
 
+                if os.path.isfile(file_obj):
+                    i += 1
+                    attribute_name = 'attfile' + str(i)
+
+                    file_obj = builtins.open(file_obj, 'rb')
+                    print(file_obj)
+                    content += self.__param_to_content(attribute_name, file_obj.read(), boundary,
+                                                       filename=file_obj.name)
+
+                elif not file_obj.startswith(self._url):
+                    raise TypeError('Invalid type of attachment: \"' + file_obj + '\".')
+            else:
+                raise TypeError('Invalid type of attachment[' + str(i) + '].')
+        # Todo type errors replace
         return(content)
 
     def __remove_reserved_attributes(self, attributes):
-        # Delete attributes that cannot be sent (reserved by elog)
+        '''
+        Removes elog reserved attributes (from the attributes dict) that can not be sent.
+
+        :param attributes: dictionary of attributes to be cleaned.
+        :return:
+        '''
 
         if attributes:
             attributes.get('$@MID@$', None)
@@ -271,6 +344,10 @@ class Logbook(object):
             attributes.pop('Reply to', None)
 
     def __make_user_and_pswd_cookie(self):
+        '''
+        prepares user name and password cookie. It is sent in header when posting a message.
+        :return: user name and password value for the Cookie header
+        '''
         cookie=''
         if self._user:
             cookie += 'unm=' + self._user + ';'
@@ -298,4 +375,10 @@ class Logbook(object):
             return(password)
 
 def open(*args, **kwargs):
+    '''
+    Will return a Logbook object. All arguments are passed to the logbook constructor.
+    :param args:
+    :param kwargs:
+    :return: Logbook() instance
+    '''
     return(Logbook(*args, **kwargs))
