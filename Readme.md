@@ -51,7 +51,7 @@ elog.open(hostname, logbook='', port=None, user=None, password=None, subdir='', 
 ```
 Creates a new logbook object.
 
-**hostname**: elog server hostname. If whole url is specified here, it will be parsed and arguments: "logbook, port, subdir, use_ssl" will be overridden by parsed values.
+**hostname**: elog server hostname. If whole url is specified here, it will be parsed and arguments: "logbook, port, subdir, use_ssl" will be overwritten by parsed values.
 
 **logbook**: name of the logbook on the elog server
 

@@ -1,6 +1,6 @@
 package:
     name: elog
-    version: 0.9.0
+    version: 0.9.1
 source:
     path: ..
 
@@ -11,5 +11,5 @@ requirements:
         - passlib
 
 about:
-    home: https://git.psi.ch/cosylab/CameraTool
-    summary: "BeamDynamics camera acquisition and processing tool"
+    home: https://git.psi.ch/cosylab/py_elog
+    summary: "Interface to electronic logbooks elog."

@@ -12,10 +12,11 @@ class Logbook(object):
     edit, delete logbook messages.
     """
 
-    def __init__(self, hostname, logbook, port=None, user=None, password=None, subdir='', use_ssl=True,
+    def __init__(self, hostname, logbook='', port=None, user=None, password=None, subdir='', use_ssl=True,
                  encrypt_pwd=True):
         """
-        :param hostname: elog server hostname
+        :param hostname: elog server hostname. If whole url is specified here, it will be parsed and arguments:
+                         "logbook, port, subdir, use_ssl" will be overwritten by parsed values.
         :param logbook: name of the logbook on the elog server
         :param port: elog server port (if not specified will default to '80' if use_ssl=False or '443' if use_ssl=True
         :param user: username (if authentication needed)
@@ -28,22 +29,48 @@ class Logbook(object):
                             salt= '' and rounds=5000)
         :return:
         """
-        self.logbook = logbook
+
+        # handle if logbook is url
+        if hostname.startswith('http'):
+            self._url = hostname
+            url_parsed = urllib.parse.urlparse(hostname)
+
+            use_ssl =  (url_parsed == 'https')  # else is http
+            net_location = url_parsed.netloc.split(':')
+            hostname = net_location[0]
+            if len(net_location) > 1:
+                port = net_location[1]
+            else:
+                port = None
+
+            self._logbook_path = url_parsed.path
+            # logbook is the last in url_parsed.path everything before is a subdir
+            url_path = url_parsed.path[1:] # remove trailing /
+            if url_path.endswith('/'):
+                url_path = url_path[:-1]
+
+            url_path = url_path.split('/')
+
+            self.logbook = url_path[-1]
+
+
+        else:
+            self.logbook = logbook
+            self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
+
+            if port or (port == 80 and not use_ssl) or (port == 443 and use_ssl):
+                url = hostname + ':' + str(port)
+            else:
+                url = hostname
+
+            if use_ssl:
+                # self.server = http.client.HTTPSConnection(hostname, port=port, context=ssl.SSLContext(ssl.PROTOCOL_TLSv1))
+                self._url = 'https://' + url + self._logbook_path
+            else:
+                self._url = 'http://' + url + self._logbook_path
+
         self._user = user
         self._password = self.__handle_pswd(password, encrypt_pwd)
-
-        self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
-
-        if port or (port == 80 and not use_ssl) or (port == 443 and use_ssl):
-            url = hostname + ':' + str(port)
-        else:
-            url = hostname
-
-        if use_ssl:
-            # self.server = http.client.HTTPSConnection(hostname, port=port, context=ssl.SSLContext(ssl.PROTOCOL_TLSv1))
-            self._url = 'https://' + url + self._logbook_path
-        else:
-            self._url = 'http://' + url + self._logbook_path
 
     def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
                  **kwargs):
@@ -133,6 +160,12 @@ class Logbook(object):
                                  verify = False)
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
+
+            # Close file like objects
+            for attachment in  files_to_attach:
+                if hasattr(attachment, 'close'):
+                    attachment.close()
+
         except requests.RequestException as e:
             # This means there were no response on download command. Check if message on server.
             self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
