@@ -19,33 +19,39 @@ gfa_logbook = elog.open('https://elog-gfa/SwissFEL+test/')'
 
 Once elog object is created one of its public methods can be used to read, create, reply to, edit or delete the message.
 - read:
-```python
-# Read message with with message ID = 23
-message, attributes, attachments = my_logbook.read_msg(23)
-```
+
+ ``` python
+ # Read message with with message ID = 23
+ message, attributes, attachments = my_logbook.read_msg(23)
+ ```
 - create:
-```python
-# Create new message with some text, attributes (dict of attributes + kwargs) and attachments
-new_msg_id = my_logbook.post_msg('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
-```
+
+ ``` python
+ # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
+ new_msg_id = my_logbook.post_msg('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ ```
 - reply to:
-```python
-# Reply to message with ID=23
-new_msg_id = my_logbook.post_msg('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
-```
+
+ ```python
+ # Reply to message with ID=23
+ new_msg_id = my_logbook.post_msg('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ ```
 - edit:
-```python
-# Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
-edited_msg_id = my_logbook.post_msg('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
-```
+
+ ```python
+ # Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
+ edited_msg_id = my_logbook.post_msg('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
+ ```
 - delete (message and all its replies):
+
 ```python
-# Delete message with ID=23. All its replies will also be deleted.
-my_logbook.delete_msg_thread(23)
-```
+ # Delete message with ID=23. All its replies will also be deleted.
+ my_logbook.delete_msg_thread(23)
+ ```
 
 # Methods
 ## elog.open()
+
 ```python
 elog.open(hostname, logbook='', port=None, user=None, password=None, subdir='', use_ssl=True, encrypt_pwd=True))
 ```
@@ -71,6 +77,7 @@ Creates a new logbook object.
 **return**: Logbook() object.
 
 ## logbook.read_msg()
+
 ```python
 read_msg(msg_id)
 ```
@@ -87,8 +94,8 @@ Reads message from the logbook server and returns tuple of (message, attributes,
 -----------------------------------------------
 **return**: message, attributes, attachments
 
-
 ## logbook.post_msg()
+
 ```python
 post_msg(message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain', **kwargs)
 ```
