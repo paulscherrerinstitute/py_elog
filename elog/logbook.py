@@ -242,11 +242,11 @@ class Logbook(object):
         try:
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
+
             self.__validate_response(response)
         except requests.RequestException as e:
             # This means there were no response on download command. Check if message on server.
-            self.__check_if_message_on_server(
-                msg_id)  # raises exceptions when missing message or no response from server
+            self.__check_if_message_on_server(msg_id)  # raises exceptions when error can not be identified
             # If here: message is on server but cannot be downloaded (should never happen)
             raise LogbookServerProblem('Cannot access logbook server to delete the message with ID: ' + str(msg_id) +
                                        'because of:\n' + '{0}'.format(e))
@@ -363,7 +363,6 @@ class Logbook(object):
 
     def __validate_response(self, response):
         """ Validate response of the request."""
-
         msg_id = None
 
         if response.status_code not in [200, 302]:
@@ -371,17 +370,20 @@ class Logbook(object):
             # Html page is returned with error description (handling errors same way as on original client. Looks
             # like there is no other way.
 
-            err = re.findall('Error:.*?</td>', response.content.decode('utf-8'), flags=re.DOTALL)
+            err = re.findall('class="errormsg">.*?</td>', response.content.decode('utf-8'), flags=re.DOTALL)
 
             if len(err) > 0:
                 # Remove html tags
                 # If part of the message has: Please go  back... remove this part since it is an instruction for
                 # the user when using browser.
-                err = re.sub('(?:<.*?>|Please go back.*)', '', err[0])
+                err = re.sub('(?:<.*?>)', '', err[0])[17:]
                 if err:
                     raise LogbookMessageRejected('Rejected because of: ' + err)
+                else:
+                    raise LogbookMessageRejected('Rejected because of unknown error.')
+
             # Other unknown errors
-            raise LogbookMessageRejected('Rejected because of unknown error')
+            raise LogbookMessageRejected('Rejected because of unknown error.')
         else:
             location = response.headers.get('Location')
             if location is not None:
@@ -392,10 +394,10 @@ class Logbook(object):
                 else:
                     msg_id = int(location.split('/')[-1])
 
-                if b'form name=form1' in response.content or b'enter password' in response.content:
-                    # Not to smart to check this way, but no other indication of this kind of error.
-                    # C client does it the same way
-                    raise LogbookAuthenticationError('Invalid username or password.')
+            if b'form name=form1' in response.content or b'type=password' in response.content:
+                # Not to smart to check this way, but no other indication of this kind of error.
+                # C client does it the same way
+                raise LogbookAuthenticationError('Invalid username or password.')
 
         return(response.content, response.headers, msg_id)
 
