@@ -324,6 +324,7 @@ class Logbook(object):
                     attribute_name = 'attfile' + str(i)
 
                     file_obj = builtins.open(file_obj, 'rb')
+                    filename = os.path.basename(file_obj.name)
 
                 elif not file_obj.startswith(self._url):
                     raise LogbookInvalidAttachmentType('Invalid type of attachment: \"' + file_obj + '\".')
