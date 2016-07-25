@@ -9,6 +9,7 @@ requirements:
         - setuptools
         - python
         - passlib
+        - requests
     run:
         - python
         - passlib
