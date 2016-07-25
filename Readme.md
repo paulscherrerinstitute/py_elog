@@ -4,7 +4,7 @@ This python module provides a interface to [electronic logbooks](https://midas.p
 # Quick start
 > This is a quick intro into using an elog module, for detailed information about specific methods, please consult section [Methods](#Methods).
 
-For each logbook (http[s]://<hostename>:<port>/[<subdir>/]<logbook>/[<msg_id>]) that needs to be accessed, either for reading or posting messages, a new logbook object must be created ()
+For each logbook (```http[s]://<hostename>:<port>/[<subdir>/]<logbook>/[<msg_id>]```) that needs to be accessed, either for reading or posting messages, a new Logbook object must be created.
 ```python
 import elog 
 
@@ -50,7 +50,7 @@ Once elog object is created one of its public methods can be used to read, creat
  ```
 
 # Methods
-## elog.open()
+## open()
 
 ```python
 elog.open(hostname, logbook='', port=None, user=None, password=None, subdir='', use_ssl=True, encrypt_pwd=True))
