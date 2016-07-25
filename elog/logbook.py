@@ -35,7 +35,7 @@ class Logbook(object):
             self._url = hostname
             url_parsed = urllib.parse.urlparse(hostname)
 
-            use_ssl =  (url_parsed == 'https')  # else is http
+            use_ssl = (url_parsed == 'https')  # else is http
             net_location = url_parsed.netloc.split(':')
             hostname = net_location[0]
             if len(net_location) > 1:
@@ -45,14 +45,13 @@ class Logbook(object):
 
             self._logbook_path = url_parsed.path
             # logbook is the last in url_parsed.path everything before is a subdir
-            url_path = url_parsed.path[1:] # remove trailing /
+            url_path = url_parsed.path[1:]  # remove trailing /
             if url_path.endswith('/'):
                 url_path = url_path[:-1]
 
             url_path = url_path.split('/')
 
             self.logbook = url_path[-1]
-
 
         else:
             self.logbook = logbook
@@ -64,7 +63,6 @@ class Logbook(object):
                 url = hostname
 
             if use_ssl:
-                # self.server = http.client.HTTPSConnection(hostname, port=port, context=ssl.SSLContext(ssl.PROTOCOL_TLSv1))
                 self._url = 'https://' + url + self._logbook_path
             else:
                 self._url = 'http://' + url + self._logbook_path
@@ -157,12 +155,12 @@ class Logbook(object):
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
-                                 verify = False)
+                                     verify=False)
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
 
             # Close file like objects
-            for attachment in  files_to_attach:
+            for attachment in files_to_attach:
                 if hasattr(attachment, 'close'):
                     attachment.close()
 

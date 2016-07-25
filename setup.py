@@ -14,7 +14,10 @@ setup(name='elog',
       classifiers=[
           'Programming Language :: Python:: 3.5',
           ],
-      url = "https://git.psi.ch/cosylab/py_elog",
+      url="https://git.psi.ch/cosylab/py_elog",
       keywords='elog, electronic, logbook',
       packages=['elog'],
-)
+      install_requires=[
+          'requests', 'passlib'
+      ],
+      )

@@ -12,6 +12,7 @@ requirements:
     run:
         - python
         - passlib
+        - requests
 
 about:
     home: https://git.psi.ch/cosylab/py_elog
