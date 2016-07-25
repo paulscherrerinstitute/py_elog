@@ -7,7 +7,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'Readme.md')).read()
 
 setup(name='elog',
-      version='0.9.1',
+      version='1.0.0',
       description="Python library to access Elog.",
       long_description=README,
       author='Paul Scherrer Institute (PSI)',
