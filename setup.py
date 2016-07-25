@@ -10,11 +10,11 @@ setup(name='elog',
       version='0.9.1',
       description="Python library to access Elog.",
       long_description=README,
-      author='Rok Vintar',
+      author='Paul Scherrer Institute (PSI)',
       classifiers=[
           'Programming Language :: Python:: 3.5',
           ],
-      url = "http://packages.python.org/an_example_pypi_project",
+      url = "https://git.psi.ch/cosylab/py_elog",
       keywords='elog, electronic, logbook',
       packages=['elog'],
 )

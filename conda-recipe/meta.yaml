@@ -9,6 +9,9 @@ requirements:
         - setuptools
         - python
         - passlib
+    run:
+        - python
+        - passlib
 
 about:
     home: https://git.psi.ch/cosylab/py_elog
