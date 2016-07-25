@@ -70,8 +70,8 @@ class Logbook(object):
         self._user = user
         self._password = self.__handle_pswd(password, encrypt_pwd)
 
-    def post_msg(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
-                 **kwargs):
+    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
+             **kwargs):
         """
         Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
         message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
@@ -90,7 +90,7 @@ class Logbook(object):
                             attachment an exception LogbookInvalidAttachment will be raised.
         :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
                          'ELCode' --> elog formatting syntax
-        :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post_msg('Test text',
+        :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post('Test text',
                        Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
                        attributes defined in "attributes", kwargs will have priority.
 
@@ -120,7 +120,7 @@ class Logbook(object):
                 attributes['skiplock'] = '1'
 
                 # Handle existing attachments
-                msg_to_edit, attributes_to_edit, attach_to_edit = self.read_msg(msg_id)
+                msg_to_edit, attributes_to_edit, attach_to_edit = self.read(msg_id)
 
                 i = 0
                 for attachment in attach_to_edit:
@@ -177,7 +177,7 @@ class Logbook(object):
             raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
         return(resp_msg_id)
 
-    def read_msg(self, msg_id):
+    def read(self, msg_id):
         """
         Reads message from the logbook server and returns tuple of (message, attributes, attachments) where:
         message: string with message body
@@ -226,7 +226,7 @@ class Logbook(object):
 
         return(message, attributes, attachments)
 
-    def delete_msg_thread(self, msg_id):
+    def delete(self, msg_id):
         """
         Deletes message thread (!!!message + all replies!!!) from logbook.
         It also deletes all of attachments of corresponding messages from the server.
