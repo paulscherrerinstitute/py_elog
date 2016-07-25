@@ -23,34 +23,34 @@ __Read Message__
 
  ``` python
  # Read message with with message ID = 23
- message, attributes, attachments = my_logbook.read_msg(23)
+ message, attributes, attachments = my_logbook.read(23)
  ```
 __Create Message__
 
  ``` python
  # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
- new_msg_id = my_logbook.post_msg('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ new_msg_id = my_logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
  ```
 
 __Reply to Message__
 
  ```python
  # Reply to message with ID=23
- new_msg_id = my_logbook.post_msg('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ new_msg_id = my_logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
  ```
 
 __Edit Message__
 
  ```python
  # Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
- edited_msg_id = my_logbook.post_msg('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
+ edited_msg_id = my_logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
  ```
 
 __Delete Message (and all its replies)__
 
 ```python
  # Delete message with ID=23. All its replies will also be deleted.
- my_logbook.delete_msg_thread(23)
+ my_logbook.delete(23)
  ```
 
 # API Documentation
@@ -75,10 +75,10 @@ Parameters:
 
 - **return**: Logbook() object.
 
-### logbook.read_msg()
+### logbook.read()
 
 ```python
-read_msg(msg_id)
+read(msg_id)
 ```
 
 Read specific message from logbook.
@@ -91,10 +91,10 @@ Parameters:
   - **attributes**: dictionary of all attributes returned by the logbook
   - **attachments**: list of urls to attachments on the logbook server
 
-### logbook.post_msg()
+### logbook.post()
 
 ```python
-post_msg(message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain', **kwargs)
+post(message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain', **kwargs)
 ```
 
 Create or edit a message in the logbook. If *msg_id* is not specified, a new message will be created. Otherwise the existing message will be edited, or a reply (if reply=True) to it will be created.
@@ -109,15 +109,15 @@ Parameters:
   - Paths to the files
  All items will be appended as attachment to the elog entry. In case of unknown attachment an exception ```LogbookInvalidAttachment``` will be raised.
 - **encoding**: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text, 'ELCode' --> elog formatting syntax
-- **kwargs**: Anything in the kwargs will be interpreted as attribute. e.g.: `logbook.post_msg('Test text', Author='Name')`, *"Author"* will be sent as an attribute. If named same as one of the
+- **kwargs**: Anything in the kwargs will be interpreted as attribute. e.g.: `logbook.post('Test text', Author='Name')`, *"Author"* will be sent as an attribute. If named same as one of the
 attributes defined in *"attributes"*, kwargs will have priority.
 
 - **return**: *msg_id* - Id of the newly created/edited message
 
-### logbook.delete_msg_thread()
+### logbook.delete()
 
 ```python
-delete_msg_thread(msg_id)
+delete(msg_id)
 ```
 
 Deletes message thread (__message including all replies__) from logbook. It also deletes all attachments of deleted messages from the server.
