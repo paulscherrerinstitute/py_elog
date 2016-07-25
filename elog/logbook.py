@@ -5,6 +5,10 @@ import builtins
 import re
 from elog.logbook_exceptions import *
 
+# disable warnings about ssl verification
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 
 class Logbook(object):
     """
