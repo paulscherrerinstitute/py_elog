@@ -150,7 +150,7 @@ class Logbook(object):
         self.__remove_reserved_attributes(attributes_to_edit)
 
         if attachments:
-            files_to_attach = self.__prepare_attachments(attachments)
+            files_to_attach, objects_to_close = self.__prepare_attachments(attachments)
         else:
             files_to_attach = list()
 
@@ -167,10 +167,10 @@ class Logbook(object):
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
 
-            # Close file like objects
-            for attachment in files_to_attach:
-                if hasattr(attachment, 'close'):
-                    attachment.close()
+            # Close file like objects that were opened by the elog (if  path
+            for file_like_object in objects_to_close:
+                if hasattr(file_like_object, 'close'):
+                    file_like_object.close()
 
         except requests.RequestException as e:
             # Check if message on server.
@@ -183,7 +183,7 @@ class Logbook(object):
         # Any error before here should raise an exception, but check again for nay case.
         if not resp_msg_id or resp_msg_id < 1:
             raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
-        return(resp_msg_id)
+        return resp_msg_id
 
     def read(self, msg_id):
         """
@@ -232,7 +232,7 @@ class Logbook(object):
             else:
                 attributes[line[0]] = data
 
-        return(message, attributes, attachments)
+        return message, attributes, attachments
 
     def delete(self, msg_id):
         """
@@ -319,6 +319,7 @@ class Logbook(object):
         """
         prepared = list()
         i = 0
+        objects_to_close = list() # objects that are created (opened) by elog must be later closed
         for file_obj in files:
             if hasattr(file_obj, 'read'):
                 i += 1
@@ -342,6 +343,8 @@ class Logbook(object):
                     file_obj = builtins.open(file_obj, 'rb')
                     filename = os.path.basename(file_obj.name)
 
+                    objects_to_close.append(file_obj)
+
                 elif not file_obj.startswith(self._url):
                     raise LogbookInvalidAttachmentType('Invalid type of attachment: \"' + file_obj + '\".')
             else:
@@ -349,7 +352,7 @@ class Logbook(object):
 
             prepared.append((attribute_name, (filename, file_obj)))
 
-        return(prepared)
+        return prepared, objects_to_close
 
     def __remove_reserved_attributes(self, attributes):
         """
@@ -377,7 +380,7 @@ class Logbook(object):
         if self._password:
             cookie += 'upwd=' + self._password + ';'
 
-        return(cookie)
+        return cookiereturn
 
     def __validate_response(self, response):
         """ Validate response of the request."""
@@ -418,7 +421,7 @@ class Logbook(object):
                 # C client does it the same way
                 raise LogbookAuthenticationError('Invalid username or password.')
 
-        return(response.content, response.headers, msg_id)
+        return response.content, response.headers, msg_id
 
     def __handle_pswd(self, password, encrypt=True):
         """
@@ -432,8 +435,8 @@ class Logbook(object):
         """
         if encrypt and password:
             from passlib.hash import sha256_crypt
-            return(sha256_crypt.encrypt(password, salt='', rounds=5000)[4:])
+            return sha256_crypt.encrypt(password, salt='', rounds=5000)[4:]
         elif password and password.startswith('$5$$'):
-            return(password[4:])
+            return password[4:]
         else:
-            return(password)
+            return password
