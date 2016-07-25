@@ -118,7 +118,7 @@ class Logbook(object):
         if msg_id:
             # Message exists, we can continue
             if reply:
-                # Verify that there is a message on the server, otherwise do not reply or reply to it!
+                # Verify that there is a message on the server, otherwise do not reply to it!
                 self.__check_if_message_on_server(msg_id)  # raises exception in case of none existing message
 
                 attributes['reply_to'] = str(msg_id)
@@ -173,7 +173,7 @@ class Logbook(object):
                     attachment.close()
 
         except requests.RequestException as e:
-            # This means there were no response on download command. Check if message on server.
+            # Check if message on server.
             self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
 
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -251,17 +251,23 @@ class Logbook(object):
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
-            self.__validate_response(response)
+            self.__check_if_message_on_server(msg_id) # check if something to delete
+            self.__validate_response(response) # raises exception if any other error identified
+
         except requests.RequestException as e:
-            # This means there were no response on download command. Check if message on server.
-            self.__check_if_message_on_server(msg_id)  # raises exceptions when error can not be identified
             # If here: message is on server but cannot be downloaded (should never happen)
             raise LogbookServerProblem('Cannot access logbook server to delete the message with ID: ' + str(msg_id) +
                                        'because of:\n' + '{0}'.format(e))
 
+        # Additional validation: If successfully deleted then status_code = 302. In case command was not executed at
+        # all (not English language --> no download command supported) status_code = 200 and the content is just a
+        # html page of this whole message.
+        if response.status_code == 200:
+            raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
+
     def __check_if_message_on_server(self, msg_id):
-        """Try to load page for specific message. If there is text 'This entry has been deleted' on the page,
-        message has been deleted or not yet created.
+        """Try to load page for specific message. If there is a htm tag like <td class="errormsg"> then there is no
+        such message.
 
         :param msg_id: ID of message to be checked
         :return:
@@ -273,9 +279,13 @@ class Logbook(object):
         try:
             response = requests.get(self._url + str(msg_id), headers=request_headers, allow_redirects=False,
                                     verify=False)
-            # Validate response. If problems Exception will be thrown.
+
+            # If there is no message code 200 will be returned (OK) and __validate_response will not recognise it
+            # but there will be some error in the html code.
             resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
-            if b'This entry has been deleted' in resp_message:
+            # If there is no message, code 200 will be returned (OK) but there will be some error indication in
+            # the html code.
+            if re.findall('<td.*?class="errormsg".*?>.*?</td>', resp_message.decode('utf-8'), flags=re.DOTALL):
                 raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
 
         except requests.RequestException as e:
@@ -371,6 +381,7 @@ class Logbook(object):
 
     def __validate_response(self, response):
         """ Validate response of the request."""
+
         msg_id = None
 
         if response.status_code not in [200, 302]:
@@ -378,13 +389,13 @@ class Logbook(object):
             # Html page is returned with error description (handling errors same way as on original client. Looks
             # like there is no other way.
 
-            err = re.findall('class="errormsg">.*?</td>', response.content.decode('utf-8'), flags=re.DOTALL)
+            err = re.findall('<td.*?class="errormsg".*?>.*?</td>', response.content.decode('utf-8'), flags=re.DOTALL)
 
             if len(err) > 0:
                 # Remove html tags
                 # If part of the message has: Please go  back... remove this part since it is an instruction for
                 # the user when using browser.
-                err = re.sub('(?:<.*?>)', '', err[0])[17:]
+                err = re.sub('(?:<.*?>)', '', err[0])
                 if err:
                     raise LogbookMessageRejected('Rejected because of: ' + err)
                 else:
