@@ -32,7 +32,7 @@ class Logbook(object):
 
         # handle if logbook is url
         if hostname.startswith('http'):
-            self._url = hostname
+            self._url = hostname.strip()
             url_parsed = urllib.parse.urlparse(hostname)
 
             use_ssl = (url_parsed == 'https')  # else is http
@@ -48,6 +48,10 @@ class Logbook(object):
             url_path = url_parsed.path[1:]  # remove trailing /
             if url_path.endswith('/'):
                 url_path = url_path[:-1]
+            else:
+                # self._url is used for actual requests. If there is no / at the end a response from server might be
+                # have wrong parameters for "Location" which is used to determine new msg_id
+                self._url += '/'
 
             url_path = url_path.split('/')
 
