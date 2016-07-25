@@ -13,7 +13,7 @@ demo_logbook = elog.open('localhost', 'demo', port=8080, use_ssl=False)
 
 # shorter version
 # psi-gfa logbook:
-gfa_logbook = elog.open('https://elog-gfa/SwissFEL+test/')'
+gfa_logbook = elog.open('https://elog-gfa/SwissFEL+test/')
 # equals to: elog.open('elog-gfa', 'SwissFEL test', user='uname', password='pass')  # defaults: use-ssl=True, port=443 (for ssl)
 ```
 
