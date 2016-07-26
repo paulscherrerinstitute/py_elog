@@ -53,6 +53,8 @@ __Delete Message (and all its replies)__
  my_logbook.delete(23)
  ```
 
+__Note:__ Due to the way elog implements delete this function is only supported on english logbooks.
+
 # API Documentation
 ## Methods
 ### open()
@@ -115,6 +117,8 @@ attributes defined in *"attributes"*, kwargs will have priority.
 - **return**: *msg_id* - Id of the newly created/edited message
 
 ### logbook.delete()
+
+__Note:__ Due to the way elog implements delete this function is only supported on english logbooks.
 
 ```python
 delete(msg_id)
