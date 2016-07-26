@@ -1,6 +1,13 @@
 # Overview
 This Python module provides an interface to [electronic logbooks](https://midas.psi.ch/elog/). It is compatible with Python versions 3.5 and higher.
 
+# Installation
+The Elog module and only depends on the `passlib` and `requests` library used for password encryption and http(s) communication. It is packed as [anaconda package](https://anaconda.org/paulscherrerinstitute/elog) and can be installed as follows:
+
+```bash
+conda install -c paulscherrerinstitute elog
+```
+
 # Quick Start
 
 For accessing a logbook at ```http[s]://<hostename>:<port>/[<subdir>/]<logbook>/[<msg_id>]``` a logbook handle must be retrieved.
@@ -9,11 +16,11 @@ For accessing a logbook at ```http[s]://<hostename>:<port>/[<subdir>/]<logbook>/
 import elog
 
 # demo logbook on local host: http://localhost:8080/demo/
-demo_logbook = elog.open('localhost', 'demo', port=8080, use_ssl=False)
+logbook = elog.open('localhost', 'demo', port=8080, use_ssl=False)
 
 # shorter version
 # psi-gfa logbook:
-gfa_logbook = elog.open('https://elog-gfa/SwissFEL+test/')
+logbook = elog.open('https://elog-gfa/SwissFEL+test/')
 # equals to: elog.open('elog-gfa', 'SwissFEL test', user='uname', password='pass')  # defaults: use-ssl=True, port=443 (for ssl)
 ```
 
@@ -23,34 +30,34 @@ __Read Message__
 
  ``` python
  # Read message with with message ID = 23
- message, attributes, attachments = my_logbook.read(23)
+ message, attributes, attachments = logbook.read(23)
  ```
 __Create Message__
 
  ``` python
  # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
- new_msg_id = my_logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
  ```
 
 __Reply to Message__
 
  ```python
  # Reply to message with ID=23
- new_msg_id = my_logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+ new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
  ```
 
 __Edit Message__
 
  ```python
  # Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
- edited_msg_id = my_logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
+ edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
  ```
 
 __Delete Message (and all its replies)__
 
 ```python
  # Delete message with ID=23. All its replies will also be deleted.
- my_logbook.delete(23)
+ logbook.delete(23)
  ```
 
 __Note:__ Due to the way elog implements delete this function is only supported on english logbooks.
@@ -160,7 +167,3 @@ Raised when there is no message with specified ID on the server.
 
 ### LogbookServerProblem
 Raised when there are problems accessing the logbook server.
-
-
-# Installation
-Elog module depends on ```passlib``` library used for password encryption. It is packed as anaconda package and can be installed as any other anaconda package.
