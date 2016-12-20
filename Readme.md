@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/paulscherrerinstitute/py_elog.svg?branch=master)](https://travis-ci.org/paulscherrerinstitute/py_elog) [![Build status](https://ci.appveyor.com/api/projects/status/glo428gqw951y512?svg=true)](https://ci.appveyor.com/project/simongregorebner/py-elog)
+
 # Overview
 This Python module provides an interface to [electronic logbooks](https://midas.psi.ch/elog/). It is compatible with Python versions 3.5 and higher.
 
