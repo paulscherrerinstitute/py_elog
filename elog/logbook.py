@@ -33,40 +33,79 @@ class Logbook(object):
                             salt= '' and rounds=5000)
         :return:
         """
+        hostname = hostname.strip()
+        
+        # parse url to see if some parameters are defined with url
+        parsed_url = urllib.parse.urlsplit(hostname)
 
+        # ---- handle SSL -----
+        # hostname must be modified according to use_ssl flag. If hostname starts with https:// or http://
+        # the use_ssl flag is ignored
+        url_scheme = parsed_url.scheme
+        if url_scheme == 'http':
+            use_ssl = False
+
+        elif url_scheme == 'https':
+            use_ssl = True
+
+        elif not url_scheme:
+            # add http or https
+            if use_ssl:
+                url_scheme = 'https'
+            else:
+                url_scheme = 'http'
+
+        #else leave as it is
+
+        # ---- handle port -----
+        # 1) by default use port defined in the url
+        # 2) remove any 'default' ports such as 80 for http and 443 for https
+        # 3) if port not defined in url and not 'default' add it to netloc
+        
+        netloc = parsed_url.netloc
+        netloc_split = netloc.split(':')
+        if len(netloc_split) > 1:
+            # port defined in url --> remove if needed
+            port = netloc_split[1]
+            if (port == 80 and not use_ssl) or (port == 443 and use_ssl):
+                netloc = netloc_split[0]
+
+        else:
+            # add port info if needed
+            if port is not None and not (port == 80 and not use_ssl) and not (port == 443 and use_ssl):
+                netloc += ':{}'.format(port)
+
+        # ---- handle subdir and logbook -----
+        # parsed_url.path = /<subdir>/<logbook>/
+
+        # Remove last '/' for easier parsing
+        url_path = parsed_url.path
+        if url_path.endswith('/'):
+            url_path = url_path[:-1]
+
+        splitted_path = url_path.split('/')
+        if url_path and len(splitted_path) > 1:
+            # If here ... then at least some part of path is defined.
+
+            # If logbook defined --> treat path current path as subdir and add logbook at the end
+            # to define the full path. Else treat existing path as <subdir>/<logbook>.
+            # Put first and last '/' back on its place
+            if logbook:
+                url_path += '/{}'.format(logbook)
+            else:
+                logbook = splitted_path[-1]
+            
+        else:
+            # There is nothing. Use arguments.
+            url_path = subdir + '/' + logbook
+
+        # urllib.parse.quote replaces special characters with %xx escapes
+        self._logbook_path = urllib.parse.quote('/' + url_path + '/').replace('//', '/')
+        
+        self._url = url_scheme + '://' + netloc + self._logbook_path
         self.logbook = logbook
         self._user = user
         self._password = self._handle_pswd(password, encrypt_pwd)
-
-        # urllib.parse.quote replaces special characters with %xx escapes
-        self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
-
-        # hostname must be modified according to use_ssl flag. If hostname starts with https:// or http://
-        # the use_ssl flag is ignored
-        hostname = hostname.strip()
-        
-        if hostname.startswith('http://'):
-            use_ssl = False
-
-        elif hostname.startswith('https://'):
-            use_ssl = True
-
-        else:
-            # add http or https
-            if use_ssl:
-                hostname = 'https://' + hostname
-            else:
-                hostname = 'http://' + hostname
-
-        #At this point host name must not end with '/'
-        if hostname.endswith('/'):
-            hostname = hostname[:-1]
-
-        # Add port info to url if needed
-        if port and not (port == 80 and not use_ssl) and not (port == 443 and use_ssl):
-            self._url = hostname + ':' + str(port) + self._logbook_path
-        else:
-            self._url = hostname + self._logbook_path
 
     def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
              **kwargs):
@@ -407,7 +446,7 @@ class Logbook(object):
                 else:
                     # returned locations is something like: '<host>/<sub_dir>/<logbook>/<msg_id><query>
                     # with urllib.parse.urlparse returns attribute path=<sub_dir>/<logbook>/<msg_id>
-                    msg_id = int(urllib.parse.urlparse(location).path.split('/')[-1])
+                    msg_id = int(urllib.parse.urlsplit(location).path.split('/')[-1])
 
             if b'form name=form1' in response.content or b'type=password' in response.content:
                 # Not to smart to check this way, but no other indication of this kind of error.
