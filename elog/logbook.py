@@ -27,56 +27,46 @@ class Logbook(object):
         :param password: password (if authentication needed) Password will be encrypted with sha256 unless
                          encrypt_pwd=False (default: True)
         :param subdir: subdirectory of logbooks locations
-        :param use_ssl: connect using ssl?
+        :param use_ssl: connect using ssl (ignored if url starts with 'http://'' or 'https://'?
         :param encrypt_pwd: To avoid exposing password in the code, this flag can be set to False and password
                             will then be handled as it is (user needs to provide sha256 encrypted password with
                             salt= '' and rounds=5000)
         :return:
         """
 
-        # handle if logbook is url
-        if hostname.startswith('http'):
-            self._url = hostname.strip()
-            url_parsed = urllib.parse.urlparse(hostname)
+        self.logbook = logbook
+        self._user = user
+        self._password = self._handle_pswd(password, encrypt_pwd)
 
-            use_ssl = (url_parsed == 'https')  # else is http
-            net_location = url_parsed.netloc.split(':')
-            hostname = net_location[0]
-            if len(net_location) > 1:
-                port = net_location[1]
-            else:
-                port = None
+        # urllib.parse.quote replaces special characters with %xx escapes
+        self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
 
-            self._logbook_path = url_parsed.path
-            # logbook is the last in url_parsed.path everything before is a subdir
-            url_path = url_parsed.path[1:]  # remove trailing /
-            if url_path.endswith('/'):
-                url_path = url_path[:-1]
-            else:
-                # self._url is used for actual requests. If there is no / at the end a response from server might be
-                # have wrong parameters for "Location" which is used to determine new msg_id
-                self._url += '/'
+        # hostname must be modified according to use_ssl flag. If hostname starts with https:// or http://
+        # the use_ssl flag is ignored
+        hostname = hostname.strip()
+        
+        if hostname.startswith('http://'):
+            use_ssl = False
 
-            url_path = url_path.split('/')
-
-            self.logbook = url_path[-1]
+        elif hostname.startswith('https://'):
+            use_ssl = True
 
         else:
-            self.logbook = logbook
-            self._logbook_path = urllib.parse.quote('/' + subdir + '/' + logbook + '/').replace('//', '/')
-
-            if port or (port == 80 and not use_ssl) or (port == 443 and use_ssl):
-                url = hostname + ':' + str(port)
-            else:
-                url = hostname
-
+            # add http or https
             if use_ssl:
-                self._url = 'https://' + url + self._logbook_path
+                hostname = 'https://' + hostname
             else:
-                self._url = 'http://' + url + self._logbook_path
+                hostname = 'http://' + hostname
 
-        self._user = user
-        self._password = self.__handle_pswd(password, encrypt_pwd)
+        #At this point host name must not end with '/'
+        if hostname.endswith('/'):
+            hostname = hostname[:-1]
+
+        # Add port info to url if needed
+        if port and not (port == 80 and not use_ssl) and not (port == 443 and use_ssl):
+            self._url = hostname + ':' + str(port) + self._logbook_path
+        else:
+            self._url = hostname + self._logbook_path
 
     def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
              **kwargs):
@@ -119,7 +109,7 @@ class Logbook(object):
             # Message exists, we can continue
             if reply:
                 # Verify that there is a message on the server, otherwise do not reply to it!
-                self.__check_if_message_on_server(msg_id)  # raises exception in case of none existing message
+                self._check_if_message_on_server(msg_id)  # raises exception in case of none existing message
 
                 attributes['reply_to'] = str(msg_id)
 
@@ -147,11 +137,12 @@ class Logbook(object):
         if not attributes_to_edit:
             attributes_to_edit = attributes
         # Remove any attributes that should not be sent
-        self.__remove_reserved_attributes(attributes_to_edit)
+        self._remove_reserved_attributes(attributes_to_edit)
 
         if attachments:
-            files_to_attach, objects_to_close = self.__prepare_attachments(attachments)
+            files_to_attach, objects_to_close = self._prepare_attachments(attachments)
         else:
+            objects_to_close = list()
             files_to_attach = list()
 
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
@@ -159,13 +150,13 @@ class Logbook(object):
         files_to_attach.append(('Text', ('', message)))
 
         # Base attributes are common to all messages
-        self.__add_base_msg_attributes(attributes_to_edit)
+        self._add_base_msg_attributes(attributes_to_edit)
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
                                      verify=False)
             # Validate response. Any problems will raise an Exception.
-            resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
+            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
 
             # Close file like objects that were opened by the elog (if  path
             for file_like_object in objects_to_close:
@@ -174,7 +165,7 @@ class Logbook(object):
 
         except requests.RequestException as e:
             # Check if message on server.
-            self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
+            self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
 
             # If here: message is on server but cannot be downloaded (should never happen)
             raise LogbookServerProblem('Cannot access logbook server to post a message, ' + 'because of:\n' +
@@ -198,15 +189,15 @@ class Logbook(object):
 
         request_headers = dict()
         if self._user or self._password:
-            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
 
         try:
-            self.__check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
+            self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
             response = requests.get(self._url + str(msg_id) + '?cmd=download', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
-            resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
+            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -245,14 +236,14 @@ class Logbook(object):
 
         request_headers = dict()
         if self._user or self._password:
-            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
 
         try:
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
-            self.__check_if_message_on_server(msg_id) # check if something to delete
-            self.__validate_response(response) # raises exception if any other error identified
+            self._check_if_message_on_server(msg_id) # check if something to delete
+            self._validate_response(response) # raises exception if any other error identified
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -265,7 +256,7 @@ class Logbook(object):
         if response.status_code == 200:
             raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
 
-    def __check_if_message_on_server(self, msg_id):
+    def _check_if_message_on_server(self, msg_id):
         """Try to load page for specific message. If there is a htm tag like <td class="errormsg"> then there is no
         such message.
 
@@ -275,14 +266,14 @@ class Logbook(object):
 
         request_headers = dict()
         if self._user or self._password:
-            request_headers['Cookie'] = self.__make_user_and_pswd_cookie()
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
         try:
             response = requests.get(self._url + str(msg_id), headers=request_headers, allow_redirects=False,
                                     verify=False)
 
-            # If there is no message code 200 will be returned (OK) and __validate_response will not recognise it
+            # If there is no message code 200 will be returned (OK) and _validate_response will not recognise it
             # but there will be some error in the html code.
-            resp_message, resp_headers, resp_msg_id = self.__validate_response(response)
+            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
             # If there is no message, code 200 will be returned (OK) but there will be some error indication in
             # the html code.
             if re.findall('<td.*?class="errormsg".*?>.*?</td>', resp_message.decode('utf-8'), flags=re.DOTALL):
@@ -291,7 +282,7 @@ class Logbook(object):
         except requests.RequestException as e:
             raise LogbookServerProblem('No response from the logbook server.\nDetails: ' + '{0}'.format(e))
 
-    def __add_base_msg_attributes(self, data):
+    def _add_base_msg_attributes(self, data):
         """
         Adds base message attributes which are used by all messages.
         :param data: dict of current attributes
@@ -304,7 +295,7 @@ class Logbook(object):
         if self._password:
             data['upwd'] = self._password
 
-    def __prepare_attachments(self, files):
+    def _prepare_attachments(self, files):
         """
         Parses attachments to content objects. Attachments can be:
             - file like objects: must have method read() which returns bytes. If it has attribute .name it will be used
@@ -354,7 +345,7 @@ class Logbook(object):
 
         return prepared, objects_to_close
 
-    def __remove_reserved_attributes(self, attributes):
+    def _remove_reserved_attributes(self, attributes):
         """
         Removes elog reserved attributes (from the attributes dict) that can not be sent.
 
@@ -369,7 +360,7 @@ class Logbook(object):
             attributes.pop('Text', None)  # Remove this one because it will be send attachment like
             attributes.pop('Encoding', None)
 
-    def __make_user_and_pswd_cookie(self):
+    def _make_user_and_pswd_cookie(self):
         """
         prepares user name and password cookie. It is sent in header when posting a message.
         :return: user name and password value for the Cookie header
@@ -380,9 +371,9 @@ class Logbook(object):
         if self._password:
             cookie += 'upwd=' + self._password + ';'
 
-        return cookiereturn
+        return cookie
 
-    def __validate_response(self, response):
+    def _validate_response(self, response):
         """ Validate response of the request."""
 
         msg_id = None
@@ -414,7 +405,9 @@ class Logbook(object):
                 elif 'fail' in location:
                     raise LogbookAuthenticationError('Invalid username or password.')
                 else:
-                    msg_id = int(location.split('/')[-1])
+                    # returned locations is something like: '<host>/<sub_dir>/<logbook>/<msg_id><query>
+                    # with urllib.parse.urlparse returns attribute path=<sub_dir>/<logbook>/<msg_id>
+                    msg_id = int(urllib.parse.urlparse(location).path.split('/')[-1])
 
             if b'form name=form1' in response.content or b'type=password' in response.content:
                 # Not to smart to check this way, but no other indication of this kind of error.
@@ -423,7 +416,7 @@ class Logbook(object):
 
         return response.content, response.headers, msg_id
 
-    def __handle_pswd(self, password, encrypt=True):
+    def _handle_pswd(self, password, encrypt=True):
         """
         Takes password string and returns password as needed by elog. If encrypt=True then password will be
         sha256 encrypted (salt='', rounds=5000). Before returning password, any trailing $5$$ will be removed
