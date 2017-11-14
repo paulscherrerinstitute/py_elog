@@ -4,6 +4,7 @@ import os
 import builtins
 import re
 from elog.logbook_exceptions import *
+from datetime import datetime
 
 # disable warnings about ssl verification
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -100,7 +101,8 @@ class Logbook(object):
             url_path = subdir + '/' + logbook
 
         # urllib.parse.quote replaces special characters with %xx escapes
-        self._logbook_path = urllib.parse.quote('/' + url_path + '/').replace('//', '/')
+        # self._logbook_path = urllib.parse.quote('/' + url_path + '/').replace('//', '/')
+        self._logbook_path = ('/' + url_path + '/').replace('//', '/')
         
         self._url = url_scheme + '://' + netloc + self._logbook_path
         self.logbook = logbook
@@ -172,6 +174,10 @@ class Logbook(object):
                     new_data = attributes.get(attribute)
                     if new_data is not None:
                         attributes_to_edit[attribute] = new_data
+        else:
+            # As we create a new message, specify creation time if not already specified in attributes
+            if 'When' not in attributes:
+                attributes['When'] = int(datetime.now().strftime('%s'))
 
         if not attributes_to_edit:
             attributes_to_edit = attributes
@@ -294,6 +300,40 @@ class Logbook(object):
         # html page of this whole message.
         if response.status_code == 200:
             raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
+
+    def get_last_message_id(self):
+        ids = self.get_message_ids()
+        if len(ids) > 0:
+            return ids[0]
+        else:
+            return None
+
+    def get_message_ids(self):
+        request_headers = dict()
+        if self._user or self._password:
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
+
+        print(self._url + 'page')
+
+        try:
+            response = requests.get(self._url + 'page', headers=request_headers,
+                                    allow_redirects=False, verify=False)
+
+            # Validate response. If problems Exception will be thrown.
+            # resp_message, resp_headers, resp_msg_id = self._validate_response(response)
+            print(response)
+            resp_message = response
+
+        except requests.RequestException as e:
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to read message ids '
+                                       'because of:\n' + '{0}'.format(e))
+
+        from lxml import html
+        tree = html.fromstring(resp_message.content)
+        message_ids = tree.xpath('(//tr/td[@class="list1" or @class="list2"][1])/a/text()')
+        message_ids = [int(m.strip()) for m in message_ids]
+        return message_ids
 
     def _check_if_message_on_server(self, msg_id):
         """Try to load page for specific message. If there is a htm tag like <td class="errormsg"> then there is no
