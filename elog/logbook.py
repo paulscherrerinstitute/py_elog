@@ -286,10 +286,11 @@ class Logbook(object):
             request_headers['Cookie'] = self._make_user_and_pswd_cookie()
 
         try:
+            self._check_if_message_on_server(msg_id)  # check if something to delete
+
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
-            self._check_if_message_on_server(msg_id) # check if something to delete
             self._validate_response(response) # raises exception if any other error identified
 
         except requests.RequestException as e:
