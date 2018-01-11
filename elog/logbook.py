@@ -179,7 +179,7 @@ class Logbook(object):
         else:
             # As we create a new message, specify creation time if not already specified in attributes
             if 'When' not in attributes:
-                attributes['When'] = int(datetime.now().strftime('%s'))
+                attributes['When'] = int(datetime.now().timestamp())
 
         if not attributes_to_edit:
             attributes_to_edit = attributes
