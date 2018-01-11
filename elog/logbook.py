@@ -64,6 +64,8 @@ class Logbook(object):
         # 3) if port not defined in url and not 'default' add it to netloc
         
         netloc = parsed_url.netloc
+        if netloc == "" and "localhost" in hostname:
+            netloc = 'localhost'
         netloc_split = netloc.split(':')
         if len(netloc_split) > 1:
             # port defined in url --> remove if needed
