@@ -7,6 +7,9 @@ import elog
 
 class TestClass(unittest.TestCase):
 
+    # TODO add test for delete
+    # TODO add description how to run the test docker container for testing
+
     def test_read(self):
 
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
