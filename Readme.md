@@ -40,10 +40,34 @@ last_message_id = logbook.get_last_message_id()
  ```
 ## Create Message
 
- ``` python
- # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
- new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
- ```
+``` python
+# Create new message with some text, attributes (dict of attributes + kwargs) and attachments
+new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+```
+ 
+What attributes are required is determined by the configuration of the elog server (keywork `Required Attributes`).
+If the configuration looks like this:
+ 
+```
+Required Attributes = Author, Type
+```
+ 
+You have to provide author and type when posting a message.
+ 
+In case type need to be specified, the supported keywords can as well be found in the elog configuration with the key `Options Type`.
+ 
+If the config looks like this:
+```
+Options Type = Routine, Software Installation, Problem Fixed, Configuration, Other
+```
+
+A working create call would look like this:
+
+```python
+new_msg_id = logbook.post('This is message text', author='me', type='Routine')
+```
+
+ 
 
 ## Reply to Message
 
