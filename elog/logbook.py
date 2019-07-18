@@ -334,8 +334,8 @@ class Logbook(object):
 
         from lxml import html
         tree = html.fromstring(resp_message.content)
-        message_ids = tree.xpath('(//tr/td[@class="list1" or @class="list2"][1])/a/text()')
-        message_ids = [int(m.strip()) for m in message_ids]
+        message_ids = tree.xpath('(//tr/td[@class="list1" or @class="list2"][1])/a/@href')
+        message_ids = [int(m.split("/")[-1]) for m in message_ids]
         return message_ids
 
     def _check_if_message_on_server(self, msg_id):
