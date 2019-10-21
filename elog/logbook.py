@@ -5,6 +5,7 @@ import builtins
 import re
 from elog.logbook_exceptions import *
 from datetime import datetime
+import re
 
 # disable warnings about ssl verification
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -198,6 +199,9 @@ class Logbook(object):
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
+        
+        # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
+        attributes_to_edit = self._replace_special_characters_in_attribute_keys(attributes_to_edit)
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
@@ -441,6 +445,17 @@ class Logbook(object):
             attributes.pop('Attachment', None)
             attributes.pop('Text', None)  # Remove this one because it will be send attachment like
             attributes.pop('Encoding', None)
+            
+    def _replace_special_characters_in_attribute_keys(self, attributes):
+        """
+        Replaces special characters in elog attribute keys by underscore, otherwise attribute values will be erased in the http request.
+        This is using the same replacement elog itself is using to handle these cases
+
+        :param attributes: dictionary of attributes to be cleaned.
+        :return: attributes with replaced keys
+        """
+        cleanedAttributes = {re.sub('[^0-9a-zA-Z]+', '_', key): value for key, value in attributes.items()}
+        return cleanedAttributes
 
     def _make_user_and_pswd_cookie(self):
         """
