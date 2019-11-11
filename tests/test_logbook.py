@@ -24,7 +24,6 @@ class TestClass(unittest.TestCase):
         print(message_ids)
 
     def test_get_last_message_id(self):
-        from datetime import datetime
 
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
         msg_id = logbook.post('This is message text is new')

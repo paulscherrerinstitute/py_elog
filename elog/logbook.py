@@ -56,8 +56,6 @@ class Logbook(object):
             else:
                 url_scheme = 'http'
 
-        #else leave as it is
-
         # ---- handle port -----
         # 1) by default use port defined in the url
         # 2) remove any 'default' ports such as 80 for http and 443 for https
@@ -259,7 +257,7 @@ class Logbook(object):
         attributes = dict()
         attachments = list()
 
-        returned_msg = resp_message.decode('utf-8','ignore').splitlines()
+        returned_msg = resp_message.decode('utf-8', 'ignore').splitlines()
         delimiter_idx = returned_msg.index('========================================')
 
         message = '\n'.join(returned_msg[delimiter_idx + 1:])
@@ -295,7 +293,7 @@ class Logbook(object):
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
-            self._validate_response(response) # raises exception if any other error identified
+            self._validate_response(response)  # raises exception if any other error identified
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -359,7 +357,7 @@ class Logbook(object):
             resp_message, resp_headers, resp_msg_id = self._validate_response(response)
             # If there is no message, code 200 will be returned (OK) but there will be some error indication in
             # the html code.
-            if re.findall('<td.*?class="errormsg".*?>.*?</td>', resp_message.decode('utf-8','ignore'), flags=re.DOTALL):
+            if re.findall('<td.*?class="errormsg".*?>.*?</td>', resp_message.decode('utf-8', 'ignore'), flags=re.DOTALL):
                 raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
 
         except requests.RequestException as e:
@@ -393,7 +391,7 @@ class Logbook(object):
         """
         prepared = list()
         i = 0
-        objects_to_close = list() # objects that are created (opened) by elog must be later closed
+        objects_to_close = list()  # objects that are created (opened) by elog must be later closed
         for file_obj in files:
             if hasattr(file_obj, 'read'):
                 i += 1
@@ -444,14 +442,13 @@ class Logbook(object):
             
     def _replace_special_characters_in_attribute_keys(self, attributes):
         """
-        Replaces special characters in elog attribute keys by underscore, otherwise attribute values will be erased in the http request.
-        This is using the same replacement elog itself is using to handle these cases
+        Replaces special characters in elog attribute keys by underscore, otherwise attribute values will be erased in
+        the http request. This is using the same replacement elog itself is using to handle these cases
 
         :param attributes: dictionary of attributes to be cleaned.
         :return: attributes with replaced keys
         """
-        cleanedAttributes = {re.sub('[^0-9a-zA-Z]', '_', key): value for key, value in attributes.items()}
-        return cleanedAttributes
+        return {re.sub('[^0-9a-zA-Z]', '_', key): value for key, value in attributes.items()}
 
     def _make_user_and_pswd_cookie(self):
         """
@@ -476,7 +473,9 @@ class Logbook(object):
             # Html page is returned with error description (handling errors same way as on original client. Looks
             # like there is no other way.
 
-            err = re.findall('<td.*?class="errormsg".*?>.*?</td>', response.content.decode('utf-8','ignore'), flags=re.DOTALL)
+            err = re.findall('<td.*?class="errormsg".*?>.*?</td>',
+                             response.content.decode('utf-8', 'ignore'),
+                             flags=re.DOTALL)
 
             if len(err) > 0:
                 # Remove html tags
