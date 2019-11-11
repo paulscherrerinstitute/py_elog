@@ -10,8 +10,9 @@ requirements:
         - python
         - passlib
         - requests
+        - lxml
     no-arch: python
-    
+
     run:
         - python
         - passlib
