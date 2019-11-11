@@ -10,6 +10,8 @@ requirements:
         - python
         - passlib
         - requests
+    no-arch: python
+    
     run:
         - python
         - passlib
