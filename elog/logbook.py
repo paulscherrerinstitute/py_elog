@@ -111,7 +111,7 @@ class Logbook(object):
         self._user = user
         self._password = self._handle_pswd(password, encrypt_pwd)
 
-    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding='plain',
+    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding=None,
              **kwargs):
         """
         Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
@@ -143,10 +143,11 @@ class Logbook(object):
 
         attachments = attachments or []
 
-        if encoding not in ['plain', 'HTML', 'ELCode']:
-            raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
+        if encoding is not None:
+            if encoding not in ['plain', 'HTML', 'ELCode']:
+                raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
+            attributes['Encoding'] = encoding
 
-        attributes['encoding'] = encoding
         attributes_to_edit = dict()
         if msg_id:
             # Message exists, we can continue
@@ -440,7 +441,6 @@ class Logbook(object):
             attributes.pop('Date', None)
             attributes.pop('Attachment', None)
             attributes.pop('Text', None)  # Remove this one because it will be send attachment like
-            attributes.pop('Encoding', None)
             
     def _replace_special_characters_in_attribute_keys(self, attributes):
         """
