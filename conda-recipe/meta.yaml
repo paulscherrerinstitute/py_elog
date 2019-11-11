@@ -14,6 +14,7 @@ requirements:
         - python
         - passlib
         - requests
+        - lxml
 
 about:
     home: https://git.psi.ch/cosylab/py_elog

@@ -6,10 +6,6 @@ import re
 from elog.logbook_exceptions import *
 from datetime import datetime
 
-# disable warnings about ssl verification
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
 
 class Logbook(object):
     """
@@ -409,6 +405,9 @@ class Logbook(object):
                 # Check if it is:
                 #           - a path to the file --> open file and append
                 #           - an url pointing to the existing Logbook server --> ignore
+
+                filename = ""
+                attribute_name = ""
 
                 if os.path.isfile(file_obj):
                     i += 1
