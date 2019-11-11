@@ -323,7 +323,7 @@ class Logbook(object):
                                     allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
-            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
+            self._validate_response(response)
             resp_message = response
 
         except requests.RequestException as e:
@@ -357,7 +357,9 @@ class Logbook(object):
             resp_message, resp_headers, resp_msg_id = self._validate_response(response)
             # If there is no message, code 200 will be returned (OK) but there will be some error indication in
             # the html code.
-            if re.findall('<td.*?class="errormsg".*?>.*?</td>', resp_message.decode('utf-8', 'ignore'), flags=re.DOTALL):
+            if re.findall('<td.*?class="errormsg".*?>.*?</td>',
+                          resp_message.decode('utf-8', 'ignore'),
+                          flags=re.DOTALL):
                 raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
 
         except requests.RequestException as e:
