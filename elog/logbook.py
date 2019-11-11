@@ -5,7 +5,6 @@ import builtins
 import re
 from elog.logbook_exceptions import *
 from datetime import datetime
-import re
 
 # disable warnings about ssl verification
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -320,15 +319,12 @@ class Logbook(object):
         if self._user or self._password:
             request_headers['Cookie'] = self._make_user_and_pswd_cookie()
 
-        print(self._url + 'page')
-
         try:
             response = requests.get(self._url + 'page', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
-            # resp_message, resp_headers, resp_msg_id = self._validate_response(response)
-            print(response)
+            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
             resp_message = response
 
         except requests.RequestException as e:
