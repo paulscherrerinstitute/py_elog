@@ -450,7 +450,7 @@ class Logbook(object):
         :param attributes: dictionary of attributes to be cleaned.
         :return: attributes with replaced keys
         """
-        cleanedAttributes = {re.sub('[^0-9a-zA-Z]+', '_', key): value for key, value in attributes.items()}
+        cleanedAttributes = {re.sub('[^0-9a-zA-Z]', '_', key): value for key, value in attributes.items()}
         return cleanedAttributes
 
     def _make_user_and_pswd_cookie(self):
