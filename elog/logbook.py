@@ -107,7 +107,7 @@ class Logbook(object):
         self._url = url_scheme + '://' + netloc + self._logbook_path
         self.logbook = logbook
         self._user = user
-        self._password = self._handle_pswd(password, encrypt_pwd)
+        self._password = _handle_pswd(password, encrypt_pwd)
 
     def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding=None,
              **kwargs):
@@ -183,7 +183,7 @@ class Logbook(object):
         if not attributes_to_edit:
             attributes_to_edit = attributes
         # Remove any attributes that should not be sent
-        self._remove_reserved_attributes(attributes_to_edit)
+        _remove_reserved_attributes(attributes_to_edit)
 
         if attachments:
             files_to_attach, objects_to_close = self._prepare_attachments(attachments)
@@ -199,13 +199,13 @@ class Logbook(object):
         self._add_base_msg_attributes(attributes_to_edit)
         
         # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
-        attributes_to_edit = self._replace_special_characters_in_attribute_keys(attributes_to_edit)
+        attributes_to_edit = _replace_special_characters_in_attribute_keys(attributes_to_edit)
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
                                      verify=False)
             # Validate response. Any problems will raise an Exception.
-            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
+            resp_message, resp_headers, resp_msg_id = _validate_response(response)
 
             # Close file like objects that were opened by the elog (if  path
             for file_like_object in objects_to_close:
@@ -246,7 +246,7 @@ class Logbook(object):
                                     allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
-            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
+            resp_message, resp_headers, resp_msg_id = _validate_response(response)
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -293,7 +293,7 @@ class Logbook(object):
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
                                     allow_redirects=False, verify=False)
 
-            self._validate_response(response)  # raises exception if any other error identified
+            _validate_response(response)  # raises exception if any other error identified
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -323,7 +323,7 @@ class Logbook(object):
                                     allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
-            self._validate_response(response)
+            _validate_response(response)
             resp_message = response
 
         except requests.RequestException as e:
@@ -354,7 +354,7 @@ class Logbook(object):
 
             # If there is no message code 200 will be returned (OK) and _validate_response will not recognise it
             # but there will be some error in the html code.
-            resp_message, resp_headers, resp_msg_id = self._validate_response(response)
+            resp_message, resp_headers, resp_msg_id = _validate_response(response)
             # If there is no message, code 200 will be returned (OK) but there will be some error indication in
             # the html code.
             if re.findall('<td.*?class="errormsg".*?>.*?</td>',
@@ -428,30 +428,6 @@ class Logbook(object):
 
         return prepared, objects_to_close
 
-    def _remove_reserved_attributes(self, attributes):
-        """
-        Removes elog reserved attributes (from the attributes dict) that can not be sent.
-
-        :param attributes: dictionary of attributes to be cleaned.
-        :return:
-        """
-
-        if attributes:
-            attributes.get('$@MID@$', None)
-            attributes.pop('Date', None)
-            attributes.pop('Attachment', None)
-            attributes.pop('Text', None)  # Remove this one because it will be send attachment like
-            
-    def _replace_special_characters_in_attribute_keys(self, attributes):
-        """
-        Replaces special characters in elog attribute keys by underscore, otherwise attribute values will be erased in
-        the http request. This is using the same replacement elog itself is using to handle these cases
-
-        :param attributes: dictionary of attributes to be cleaned.
-        :return: attributes with replaced keys
-        """
-        return {re.sub('[^0-9a-zA-Z]', '_', key): value for key, value in attributes.items()}
-
     def _make_user_and_pswd_cookie(self):
         """
         prepares user name and password cookie. It is sent in header when posting a message.
@@ -465,65 +441,93 @@ class Logbook(object):
 
         return cookie
 
-    def _validate_response(self, response):
-        """ Validate response of the request."""
 
-        msg_id = None
+def _remove_reserved_attributes(attributes):
+    """
+    Removes elog reserved attributes (from the attributes dict) that can not be sent.
 
-        if response.status_code not in [200, 302]:
-            # 200 --> OK; 302 --> Found
-            # Html page is returned with error description (handling errors same way as on original client. Looks
-            # like there is no other way.
+    :param attributes: dictionary of attributes to be cleaned.
+    :return:
+    """
 
-            err = re.findall('<td.*?class="errormsg".*?>.*?</td>',
-                             response.content.decode('utf-8', 'ignore'),
-                             flags=re.DOTALL)
+    if attributes:
+        attributes.get('$@MID@$', None)
+        attributes.pop('Date', None)
+        attributes.pop('Attachment', None)
+        attributes.pop('Text', None)  # Remove this one because it will be send attachment like
 
-            if len(err) > 0:
-                # Remove html tags
-                # If part of the message has: Please go  back... remove this part since it is an instruction for
-                # the user when using browser.
-                err = re.sub('(?:<.*?>)', '', err[0])
-                if err:
-                    raise LogbookMessageRejected('Rejected because of: ' + err)
-                else:
-                    raise LogbookMessageRejected('Rejected because of unknown error.')
 
-            # Other unknown errors
-            raise LogbookMessageRejected('Rejected because of unknown error.')
-        else:
-            location = response.headers.get('Location')
-            if location is not None:
-                if 'has moved' in location:
-                    raise LogbookServerProblem('Logbook server has moved to another location.')
-                elif 'fail' in location:
-                    raise LogbookAuthenticationError('Invalid username or password.')
-                else:
-                    # returned locations is something like: '<host>/<sub_dir>/<logbook>/<msg_id><query>
-                    # with urllib.parse.urlparse returns attribute path=<sub_dir>/<logbook>/<msg_id>
-                    msg_id = int(urllib.parse.urlsplit(location).path.split('/')[-1])
+def _replace_special_characters_in_attribute_keys(attributes):
+    """
+    Replaces special characters in elog attribute keys by underscore, otherwise attribute values will be erased in
+    the http request. This is using the same replacement elog itself is using to handle these cases
 
-            if b'form name=form1' in response.content or b'type=password' in response.content:
-                # Not to smart to check this way, but no other indication of this kind of error.
-                # C client does it the same way
+    :param attributes: dictionary of attributes to be cleaned.
+    :return: attributes with replaced keys
+    """
+    return {re.sub('[^0-9a-zA-Z]', '_', key): value for key, value in attributes.items()}
+
+
+def _validate_response(response):
+    """ Validate response of the request."""
+
+    msg_id = None
+
+    if response.status_code not in [200, 302]:
+        # 200 --> OK; 302 --> Found
+        # Html page is returned with error description (handling errors same way as on original client. Looks
+        # like there is no other way.
+
+        err = re.findall('<td.*?class="errormsg".*?>.*?</td>',
+                         response.content.decode('utf-8', 'ignore'),
+                         flags=re.DOTALL)
+
+        if len(err) > 0:
+            # Remove html tags
+            # If part of the message has: Please go  back... remove this part since it is an instruction for
+            # the user when using browser.
+            err = re.sub('(?:<.*?>)', '', err[0])
+            if err:
+                raise LogbookMessageRejected('Rejected because of: ' + err)
+            else:
+                raise LogbookMessageRejected('Rejected because of unknown error.')
+
+        # Other unknown errors
+        raise LogbookMessageRejected('Rejected because of unknown error.')
+    else:
+        location = response.headers.get('Location')
+        if location is not None:
+            if 'has moved' in location:
+                raise LogbookServerProblem('Logbook server has moved to another location.')
+            elif 'fail' in location:
                 raise LogbookAuthenticationError('Invalid username or password.')
+            else:
+                # returned locations is something like: '<host>/<sub_dir>/<logbook>/<msg_id><query>
+                # with urllib.parse.urlparse returns attribute path=<sub_dir>/<logbook>/<msg_id>
+                msg_id = int(urllib.parse.urlsplit(location).path.split('/')[-1])
 
-        return response.content, response.headers, msg_id
+        if b'form name=form1' in response.content or b'type=password' in response.content:
+            # Not to smart to check this way, but no other indication of this kind of error.
+            # C client does it the same way
+            raise LogbookAuthenticationError('Invalid username or password.')
 
-    def _handle_pswd(self, password, encrypt=True):
-        """
-        Takes password string and returns password as needed by elog. If encrypt=True then password will be
-        sha256 encrypted (salt='', rounds=5000). Before returning password, any trailing $5$$ will be removed
-        independent off encrypt flag.
+    return response.content, response.headers, msg_id
 
-        :param password: password string
-        :param encrypt: encrypt password?
-        :return: elog prepared password
-        """
-        if encrypt and password:
-            from passlib.hash import sha256_crypt
-            return sha256_crypt.encrypt(password, salt='', rounds=5000)[4:]
-        elif password and password.startswith('$5$$'):
-            return password[4:]
-        else:
-            return password
+
+def _handle_pswd(password, encrypt=True):
+    """
+    Takes password string and returns password as needed by elog. If encrypt=True then password will be
+    sha256 encrypted (salt='', rounds=5000). Before returning password, any trailing $5$$ will be removed
+    independent off encrypt flag.
+
+    :param password: password string
+    :param encrypt: encrypt password?
+    :return: elog prepared password
+    """
+    if encrypt and password:
+        from passlib.hash import sha256_crypt
+        return sha256_crypt.encrypt(password, salt='', rounds=5000)[4:]
+    elif password and password.startswith('$5$$'):
+        return password[4:]
+    else:
+        return password

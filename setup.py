@@ -18,6 +18,6 @@ setup(name='elog',
       keywords='elog, electronic, logbook',
       packages=['elog'],
       install_requires=[
-          'requests', 'passlib'
+          'requests', 'passlib', 'lxml'
       ],
       )
