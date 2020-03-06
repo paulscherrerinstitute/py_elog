@@ -313,11 +313,19 @@ class Logbook(object):
 
         # Putting n_results = 0 crashes the elog. also in the web-gui.
         n_results = 1 if n_results < 1 else n_results
-        search_url = "?mode=full&reverse=1&npp=%s&%s=%s"%(n_results, scope, search_term)
+
+         params = {
+            "mode": "full",
+            "reverse": "1",
+            "npp": n_results,
+            scope: search_term
+        }
 
         try:
-            response = requests.get(self._url + search_url, headers=request_headers,
+            response = requests.get(self._url, params=params, headers=request_headers,
                                     allow_redirects=False, verify=False)
+            # response = requests.get(self._url + search_url, headers=request_headers,
+            #                         allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
             _validate_response(response)
