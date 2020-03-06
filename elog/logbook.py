@@ -314,7 +314,7 @@ class Logbook(object):
         # Putting n_results = 0 crashes the elog. also in the web-gui.
         n_results = 1 if n_results < 1 else n_results
 
-         params = {
+        params = {
             "mode": "full",
             "reverse": "1",
             "npp": n_results,
@@ -324,8 +324,6 @@ class Logbook(object):
         try:
             response = requests.get(self._url, params=params, headers=request_headers,
                                     allow_redirects=False, verify=False)
-            # response = requests.get(self._url + search_url, headers=request_headers,
-            #                         allow_redirects=False, verify=False)
 
             # Validate response. If problems Exception will be thrown.
             _validate_response(response)
