@@ -4,6 +4,9 @@ package:
 source:
     path: ..
 
+build:
+    noarch: python
+
 requirements:
     build:
         - setuptools
@@ -11,7 +14,6 @@ requirements:
         - passlib
         - requests
         - lxml
-    no-arch: python
 
     run:
         - python

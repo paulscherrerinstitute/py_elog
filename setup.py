@@ -11,13 +11,10 @@ setup(name='elog',
       description="Python library to access Elog.",
       long_description=README,
       author='Paul Scherrer Institute (PSI)',
-      classifiers=[
-          'Programming Language :: Python:: 3.5',
-          ],
-      url="https://git.psi.ch/cosylab/py_elog",
+      url="https://github.com/paulscherrerinstitute/py_elog",
       keywords='elog, electronic, logbook',
       packages=['elog'],
-      install_requires=[
-          'requests', 'passlib', 'lxml'
-      ],
+      # install_requires=[
+      #     'requests', 'passlib', 'lxml'
+      # ],
       )
