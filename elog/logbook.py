@@ -302,6 +302,45 @@ class Logbook(object):
         if response.status_code == 200:
             raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
 
+    def search(self, search_term, n_results = 20, scope="subtext"):
+        """
+        Searches the logbook and returns the message ids.
+
+        """
+        request_headers = dict()
+        if self._user or self._password:
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
+
+        # Putting n_results = 0 crashes the elog. also in the web-gui.
+        n_results = 1 if n_results < 1 else n_results
+
+        params = {
+            "mode": "full",
+            "reverse": "1",
+            "npp": n_results,
+            scope: search_term
+        }
+
+        try:
+            response = requests.get(self._url, params=params, headers=request_headers,
+                                    allow_redirects=False, verify=False)
+
+            # Validate response. If problems Exception will be thrown.
+            _validate_response(response)
+            resp_message = response
+
+        except requests.RequestException as e:
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to read message ids '
+                                       'because of:\n' + '{0}'.format(e))
+
+        from lxml import html
+        tree = html.fromstring(resp_message.content)
+        message_ids = tree.xpath('(//tr/td[@class="list1" or @class="list2"][1])/a/@href')
+        message_ids = [int(m.split("/")[-1]) for m in message_ids]
+        return message_ids
+
+
     def get_last_message_id(self):
         ids = self.get_message_ids()
         if len(ids) > 0:
