@@ -37,6 +37,11 @@ class TestClass(unittest.TestCase):
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
         logbook.post('hehehehehe', msg_id=55, attributes={"Title": 'A new one BLABLA', "When": 1510657172})
 
+    def test_search(self):
+        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        ids = logbook.search("Powersupply")
+        print(ids)
+
 
 if __name__ == '__main__':
     unittest.main()
