@@ -317,9 +317,12 @@ class Logbook(object):
         params = {
             "mode": "full",
             "reverse": "1",
-            "npp": n_results,
-            scope: search_term
+            "npp": n_results
         }
+        if type(search_term) is dict:
+            params.update(search_term)
+        else:
+            params.update({scope : search_term})        
 
         try:
             response = requests.get(self._url, params=params, headers=request_headers,
