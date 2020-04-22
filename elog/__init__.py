@@ -1,5 +1,6 @@
 from elog.logbook import Logbook
-from elog.logbook import LogbookError, LogbookAuthenticationError, LogbookServerProblem, LogbookMessageRejected, LogbookInvalidMessageID, LogbookInvalidAttachmentType
+from elog.logbook import LogbookError, LogbookAuthenticationError, LogbookServerProblem, LogbookMessageRejected, \
+    LogbookInvalidMessageID, LogbookInvalidAttachmentType
 
 
 def open(*args, **kwargs):

@@ -34,13 +34,14 @@ last_message_id = logbook.get_last_message_id()
 
 ## Read Message
 
- ``` python
- # Read message with with message ID = 23
- message, attributes, attachments = logbook.read(23)
- ```
+```python
+# Read message with with message ID = 23
+message, attributes, attachments = logbook.read(23)
+```
+
 ## Create Message
 
-``` python
+```python
 # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
 new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
 ```
@@ -71,24 +72,24 @@ new_msg_id = logbook.post('This is message text', author='me', type='Routine')
 
 ## Reply to Message
 
- ```python
- # Reply to message with ID=23
- new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
- ```
+```python
+# Reply to message with ID=23
+new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+```
 
 ## Edit Message
 
- ```python
- # Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
- edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
- ```
+```python
+# Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
+edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
+```
 
 ## Delete Message (and all its replies)
 
 ```python
- # Delete message with ID=23. All its replies will also be deleted.
- logbook.delete(23)
- ```
+# Delete message with ID=23. All its replies will also be deleted.
+logbook.delete(23)
+```
 
 __Note:__ Due to the way elog implements delete this function is only supported on english logbooks.
 

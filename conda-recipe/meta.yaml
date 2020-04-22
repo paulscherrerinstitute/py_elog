@@ -1,8 +1,11 @@
 package:
     name: elog
-    version: 1.3.2
+    version: "{{ load_setup_py_data().version }}"
 source:
     path: ..
+
+build:
+    noarch: python
 
 requirements:
     build:
@@ -10,11 +13,14 @@ requirements:
         - python
         - passlib
         - requests
+        - lxml
+
     run:
         - python
         - passlib
         - requests
+        - lxml
 
 about:
-    home: https://git.psi.ch/cosylab/py_elog
+    home: https://github.com/paulscherrerinstitute/py_elog
     summary: "Interface to electronic logbooks elog."

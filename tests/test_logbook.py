@@ -24,7 +24,6 @@ class TestClass(unittest.TestCase):
         print(message_ids)
 
     def test_get_last_message_id(self):
-        from datetime import datetime
 
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
         msg_id = logbook.post('This is message text is new')
@@ -37,6 +36,11 @@ class TestClass(unittest.TestCase):
     def test_edit(self):
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
         logbook.post('hehehehehe', msg_id=55, attributes={"Title": 'A new one BLABLA', "When": 1510657172})
+
+    def test_search(self):
+        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        ids = logbook.search("Powersupply")
+        print(ids)
 
 
 if __name__ == '__main__':
