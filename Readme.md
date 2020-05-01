@@ -84,6 +84,15 @@ new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=d
 edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
 ```
 
+## Search Messages
+
+```python
+# Search for text in messages or specify attributes for search, returns list of message ids
+logbook.search('Hello World')
+logbook.search('Hello World', n_results=20, scope='attribname')
+logbook.search({'attribname' : 'Hello World', ... })
+```
+
 ## Delete Message (and all its replies)
 
 ```python
