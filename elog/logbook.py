@@ -302,7 +302,7 @@ class Logbook(object):
         if response.status_code == 200:
             raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
 
-    def search(self, search_term, n_results = 20, scope="subtext"):
+    def search(self, search_term, n_results=20, scope="subtext"):
         """
         Searches the logbook and returns the message ids.
 
@@ -322,7 +322,7 @@ class Logbook(object):
         if type(search_term) is dict:
             params.update(search_term)
         else:
-            params.update({scope : search_term})        
+            params.update({scope: search_term})
 
         try:
             response = requests.get(self._url, params=params, headers=request_headers,
@@ -342,7 +342,6 @@ class Logbook(object):
         message_ids = tree.xpath('(//tr/td[@class="list1" or @class="list2"][1])/a/@href')
         message_ids = [int(m.split("/")[-1]) for m in message_ids]
         return message_ids
-
 
     def get_last_message_id(self):
         ids = self.get_message_ids()
