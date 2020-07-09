@@ -1,8 +1,6 @@
 name: conda_publish
 
 on:
-  watch:
-    types: [started]
   release:
     types: [published]
     
