@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/paulscherrerinstitute/py_elog.svg?branch=master)](https://travis-ci.org/paulscherrerinstitute/py_elog) [![Build status](https://ci.appveyor.com/api/projects/status/glo428gqw951y512?svg=true)](https://ci.appveyor.com/project/simongregorebner/py-elog)
+![conda_publish](https://github.com/paulscherrerinstitute/py_elog/workflows/conda_publish/badge.svg) [![Build Status](https://travis-ci.org/paulscherrerinstitute/py_elog.svg?branch=master)](https://travis-ci.org/paulscherrerinstitute/py_elog) [![Build status](https://ci.appveyor.com/api/projects/status/glo428gqw951y512?svg=true)](https://ci.appveyor.com/project/simongregorebner/py-elog)
 
 # Overview
 This Python module provides a native interface [electronic logbooks](https://midas.psi.ch/elog/). It is compatible with Python versions 3.5 and higher.
