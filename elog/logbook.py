@@ -566,7 +566,7 @@ def _handle_pswd(password, encrypt=True):
     """
     if encrypt and password:
         from passlib.hash import sha256_crypt
-        return sha256_crypt.hash(password, salt='', rounds=5000)[4:]
+        return sha256_crypt.using(salt='', rounds=5000).hash(password)[4:]
     elif password and password.startswith('$5$$'):
         return password[4:]
     else:
