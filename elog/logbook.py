@@ -105,8 +105,8 @@ class Logbook(object):
         self._user = user
         self._password = _handle_pswd(password, encrypt_pwd)
 
-    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, encoding=None,
-             **kwargs):
+    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, 
+             suppress_email_notification=False, encoding=None, **kwargs):
         """
         Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
         message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
@@ -125,6 +125,7 @@ class Logbook(object):
                             attachment an exception LogbookInvalidAttachment will be raised.
         :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
                          'ELCode' --> elog formatting syntax
+        :param suppress_email_notification: If set to True or 1, E-Mail notification will be suppressed, defaults to False.
         :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post('Test text',
                        Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
                        attributes defined in "attributes", kwargs will have priority.
@@ -141,6 +142,10 @@ class Logbook(object):
             if encoding not in ['plain', 'HTML', 'ELCode']:
                 raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
             attributes['Encoding'] = encoding
+
+        if suppress_email_notification != False:
+            attributes["suppress"] = 1
+
 
         attributes_to_edit = dict()
         if msg_id:
