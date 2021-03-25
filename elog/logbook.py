@@ -266,10 +266,15 @@ class Logbook(object):
             line = line.split(': ')
             data = ''.join(line[1:])
             if line[0] == 'Attachment':
-                attachments = data.split(',')
-                # Here are only attachment names, make a full url out of it, so they could be
-                # recognisable by others, and downloaded if needed
-                attachments = [self._url + '{0}'.format(i) for i in attachments]
+                if not data:
+                    # Treat the empty string as special case,
+                    # otherwise the split below returns [""] and attachments is [self._url]
+                    attachments = []
+                else:
+                    attachments = data.split(',')
+                    # Here are only attachment names, make a full url out of it, so they could be
+                    # recognisable by others, and downloaded if needed
+                    attachments = [self._url + '{0}'.format(i) for i in attachments]
             else:
                 attributes[line[0]] = data
 
