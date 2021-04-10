@@ -333,6 +333,13 @@ class Logbook(object):
             params.update(search_term)
         else:
             params.update({scope: search_term})
+            
+        # Remove empty entries from params, since ELog will redirect such requests
+        # and remove them anyway, but the redirect leads to unexpected results
+        keys = list(params.keys())
+        for key in keys:
+            if params[key] == "":
+                params.pop(key)
 
         try:
             response = requests.get(self._url, params=params, headers=request_headers,
