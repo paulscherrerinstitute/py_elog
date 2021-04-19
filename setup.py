@@ -14,7 +14,7 @@ setup(name='elog',
       url="https://github.com/paulscherrerinstitute/py_elog",
       keywords='elog, electronic, logbook',
       packages=['elog'],
-      # install_requires=[
-      #     'requests', 'passlib', 'lxml'
-      # ],
+      install_requires=[
+          'requests', 'passlib', 'lxml'
+      ],
       )
