@@ -41,6 +41,16 @@ class TestClass(unittest.TestCase):
         logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
         ids = logbook.search("Powersupply")
         print(ids)
+        
+    def test_search_empty(self):
+        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        ids = logbook.search("")
+        print(ids)
+        
+    def test_search_dict(self):
+        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        ids = logbook.search({"subtext": "Powersupply"})
+        print(ids)
 
 
 if __name__ == '__main__':
