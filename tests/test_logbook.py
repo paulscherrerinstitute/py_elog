@@ -2,7 +2,7 @@ import unittest
 # import logging
 import elog
 
-# logging.basicConfig(level=logging.DEBUG)
+
 
 
 class TestClass(unittest.TestCase):
@@ -10,48 +10,52 @@ class TestClass(unittest.TestCase):
     # TODO add test for delete
     # TODO add description how to run the test docker container for testing
 
-    def test_read(self):
+    elog_hostname = 'https://elog.psi.ch/elogs/Linux+Demo/'
 
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
-        message, attributes, attachments = logbook.read(23)
-        print(message)
-        self.assertEqual(message, 'Test from shell', "Unable to retrieve message")
 
     def test_get_message_ids(self):
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        logbook = elog.open(self.elog_hostname)
         message_ids = logbook.get_message_ids()
         print(len(message_ids))
         print(message_ids)
 
     def test_get_last_message_id(self):
 
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
-        msg_id = logbook.post('This is message text is new')
+        logbook = elog.open(self.elog_hostname)
+        msg_id = logbook.post('This is message text is new', attributes={'Author':'AB', 'Type':'Routine'})
         message_id = logbook.get_last_message_id()
 
         print(msg_id)
         print(message_id)
         self.assertEqual(msg_id, message_id, "Created message does not show up as last edited message")
+        
+
+    def test_read(self):
+
+        logbook = elog.open(self.elog_hostname)
+        message, attributes, attachments = logbook.read(logbook.get_last_message_id())
+        print(message)
+        self.assertEqual(message, 'This is message text is new', "Unable to retrieve message")
+
 
     def test_edit(self):
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
-        logbook.post('hehehehehe', msg_id=55, attributes={"Title": 'A new one BLABLA', "When": 1510657172})
+        logbook = elog.open(self.elog_hostname)
+        logbook.post('hehehehehe', msg_id=logbook.get_last_message_id(), attributes={"Subject": 'py_elog test [mod]'})
 
     def test_search(self):
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
-        ids = logbook.search("Powersupply")
+        logbook = elog.open(self.elog_hostname)
+        ids = logbook.search("message")
         print(ids)
         
     def test_search_empty(self):
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
+        logbook = elog.open(self.elog_hostname)
         ids = logbook.search("")
         print(ids)
         
     def test_search_dict(self):
-        logbook = elog.open('https://elog-gfa.psi.ch/SwissFEL+test/')
-        ids = logbook.search({"subtext": "Powersupply"})
+        logbook = elog.open(self.elog_hostname)
+        ids = logbook.search({"Category": "Hardware"})
         print(ids)
-
 
 if __name__ == '__main__':
     unittest.main()
