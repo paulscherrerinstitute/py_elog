@@ -6,7 +6,7 @@ from setuptools import setup
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.md')).read()
 
-setup(name='elog',
+setup(name='py_elog',
       version='1.3.11',
       description="Python library to access Elog.",
       long_description=README,
