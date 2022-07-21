@@ -1,4 +1,4 @@
-![conda_publish](https://github.com/paulscherrerinstitute/py_elog/workflows/conda_publish/badge.svg)
+[![conda_publish](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/conda_publish.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/conda_publish.yaml)
 [![pypi_publish](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/pypi_publish.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/pypi_publish.yaml)
 [![python_test](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/python_test.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/python_test.yaml)
 
