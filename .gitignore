@@ -3,3 +3,5 @@ build
 .idea
 .pyc
 __pycache__
+dist
+*.egg-info

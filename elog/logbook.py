@@ -561,7 +561,12 @@ def _validate_response(response):
             else:
                 # returned locations is something like: '<host>/<sub_dir>/<logbook>/<msg_id><query>
                 # with urllib.parse.urlparse returns attribute path=<sub_dir>/<logbook>/<msg_id>
-                msg_id = int(urllib.parse.urlsplit(location).path.split('/')[-1])
+                try:
+                    msg_id = int(urllib.parse.urlsplit(location).path.split('/')[-1])
+                except ValueError as e:
+                    # it was not possible to get the msg_id. 
+                    # this may happen when deleting the last entry of a logbook
+                    msg_id = None
 
         if b'form name=form1' in response.content or b'type=password' in response.content:
             # Not to smart to check this way, but no other indication of this kind of error.
