@@ -11,6 +11,7 @@ name: pypi_publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
