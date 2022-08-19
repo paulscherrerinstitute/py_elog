@@ -257,8 +257,7 @@ class Logbook(object):
         # Parse message to separate message body, attributes and attachments
         attributes = dict()
         attachments = list()
-
-        returned_msg = resp_message.decode('utf-8', 'ignore').splitlines()
+        returned_msg = resp_message.decode('iso-8859-1' , 'ignore').splitlines()
         delimiter_idx = returned_msg.index('========================================')
 
         message = '\n'.join(returned_msg[delimiter_idx + 1:])
