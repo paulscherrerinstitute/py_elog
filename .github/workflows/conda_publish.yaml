@@ -3,6 +3,7 @@ name: conda_publish
 on:
   release:
     types: [published, edited]
+  workflow_dispatch:
     
 jobs:
   publish:

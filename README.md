@@ -1,6 +1,6 @@
-![conda_publish](https://github.com/paulscherrerinstitute/py_elog/workflows/conda_publish/badge.svg)
-[![Python application](https://github.com/abulgher/py_elog/actions/workflows/python-app.yml/badge.svg?branch=master)](https://github.com/abulgher/py_elog/actions/workflows/python-app.yml)
-[![Upload Python Package](https://github.com/abulgher/py_elog/actions/workflows/python-publish.yml/badge.svg)](https://github.com/abulgher/py_elog/actions/workflows/python-publish.yml)
+[![conda_publish](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/conda_publish.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/conda_publish.yaml)
+[![pypi_publish](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/pypi_publish.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/pypi_publish.yaml)
+[![python_test](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/python_test.yaml/badge.svg)](https://github.com/paulscherrerinstitute/py_elog/actions/workflows/python_test.yaml)
 
 # Overview
 This Python module provides a native interface [electronic logbooks](https://midas.psi.ch/elog/). It is compatible with Python versions 3.5 and higher.
