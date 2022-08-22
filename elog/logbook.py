@@ -194,7 +194,7 @@ class Logbook(object):
 
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
         # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
-        files_to_attach.append(('Text', ('', message)))
+        files_to_attach.append(('Text', ('', message, 'text/html;charset=utf-8')))
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
