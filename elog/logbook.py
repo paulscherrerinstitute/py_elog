@@ -194,7 +194,7 @@ class Logbook(object):
 
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
         # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
-        files_to_attach.append(('Text', ('', message.encode('l1'))))
+        files_to_attach.append(('Text', ('', message.encode('iso-8859-1'))))
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
@@ -262,7 +262,7 @@ class Logbook(object):
         attributes = dict()
         attachments = list()
 
-        returned_msg = resp_message.decode('utf-8', 'ignore').splitlines()
+        returned_msg = resp_message.decode('iso-8859-1', 'ignore').splitlines()
         delimiter_idx = returned_msg.index('========================================')
 
         message = '\n'.join(returned_msg[delimiter_idx + 1:])
@@ -528,7 +528,7 @@ def _encode_values(attributes):
     encoded_attributes = {}
     for key, value in attributes.items():
         if isinstance(value, str):
-            encoded_attributes[key] = value.encode('l1')
+            encoded_attributes[key] = value.encode('iso-8859-1')
         else:
             encoded_attributes[key] = value
     return encoded_attributes
