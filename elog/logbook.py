@@ -194,17 +194,21 @@ class Logbook(object):
 
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
         # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
-        files_to_attach.append(('Text', ('', message, 'text/html;charset=utf-8')))
+        files_to_attach.append(('Text', ('', message.encode('l1'))))
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
         
         # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
         attributes_to_edit = _replace_special_characters_in_attribute_keys(attributes_to_edit)
+        
+        # All string values in the attributes must be encoded in latin1
+        attributes_to_edit = _encode_values(attributes_to_edit)
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
                                      verify=False)
+            
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
 
@@ -512,6 +516,22 @@ def _remove_reserved_attributes(attributes):
         attributes.pop('Date', None)
         attributes.pop('Attachment', None)
         attributes.pop('Text', None)  # Remove this one because it will be send attachment like
+
+def _encode_values(attributes):
+    """
+    prepares a dictionary of the attributes with latin1 encoded string values.
+
+    :param attributes: dictionary of attributes to ve encoded
+    :return: dictionary with encoded string attributes
+    """
+
+    encoded_attributes = {}
+    for key, value in attributes.items():
+        if isinstance(value, str):
+            encoded_attributes[key] = value.encode('l1')
+        else:
+            encoded_attributes[key] = value
+    return encoded_attributes
 
 
 def _replace_special_characters_in_attribute_keys(attributes):
