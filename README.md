@@ -45,7 +45,8 @@ message, attributes, attachments = logbook.read(23)
 
 ```python
 # Create new message with some text, attributes (dict of attributes + kwargs) and attachments
-new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+new_msg_id = logbook.post('This is message text', attributes=dict_of_attributes, attachments=list_of_attachments,
+                          attribute_as_param='value')
 ```
  
 What attributes are required is determined by the configuration of the elog server (keywork `Required Attributes`).
@@ -76,14 +77,16 @@ new_msg_id = logbook.post('This is message text', author='me', type='Routine')
 
 ```python
 # Reply to message with ID=23
-new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes, attachments=list_of_attachments, attribute_as_param='value')
+new_msg_id = logbook.post('This is a reply', msg_id=23, reply=True, attributes=dict_of_attributes,
+                          attachments=list_of_attachments, attribute_as_param='value')
 ```
 
 ## Edit Message
 
 ```python
 # Edit message with ID=23. Changed message text, some attributes (dict of edited attributes + kwargs) and new attachments
-edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes, attachments=list_of_new_attachments, attribute_as_param='new value')
+edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=dict_of_changed_attributes,
+                             attachments=list_of_new_attachments, attribute_as_param='new value')
 ```
 
 ## Search Messages
@@ -92,7 +95,7 @@ edited_msg_id = logbook.post('This is new message text', msg_id=23, attributes=d
 # Search for text in messages or specify attributes for search, returns list of message ids
 logbook.search('Hello World')
 logbook.search('Hello World', n_results=20, scope='attribname')
-logbook.search({'attribname' : 'Hello World', ... })
+logbook.search({'attribname': 'Hello World', ...})
 ```
 
 ## Delete Message (and all its replies)

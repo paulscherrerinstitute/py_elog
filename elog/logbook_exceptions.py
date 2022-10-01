@@ -7,6 +7,8 @@ class LogbookAuthenticationError(LogbookError):
     """ Raise when problem with username and password."""
     pass
 
+class LogbookServerTimeout(LogbookError):
+    """ Raise when the request to the logbook server timeouts. """
 
 class LogbookServerProblem(LogbookError):
     """ Raise when problem accessing logbook server."""
