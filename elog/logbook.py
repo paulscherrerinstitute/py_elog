@@ -3,6 +3,7 @@ import urllib.parse
 import os
 import builtins
 import re
+import sys
 from elog.logbook_exceptions import *
 from datetime import datetime
 
@@ -105,8 +106,8 @@ class Logbook(object):
         self._user = user
         self._password = _handle_pswd(password, encrypt_pwd)
 
-    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None, 
-             suppress_email_notification=False, encoding=None, **kwargs):
+    def post(self, message, msg_id=None, reply=False, attributes=None, attachments=None,
+             suppress_email_notification=False, encoding=None, timeout=None, **kwargs):
         """
         Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
         message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
@@ -123,9 +124,11 @@ class Logbook(object):
                                   - paths to the files
                             All items will be appended as attachment to the elog entry. In case of unknown
                             attachment an exception LogbookInvalidAttachment will be raised.
+        :param suppress_email_notification: If set to True or 1, E-Mail notification will be suppressed, defaults to False.
         :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
                          'ELCode' --> elog formatting syntax
-        :param suppress_email_notification: If set to True or 1, E-Mail notification will be suppressed, defaults to False.
+        :param timeout: Define the timeout to be used by the post request. Its value is directly passed to the requests
+                        post. Use None to disable the request timeout.
         :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post('Test text',
                        Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
                        attributes defined in "attributes", kwargs will have priority.
@@ -207,7 +210,7 @@ class Logbook(object):
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
-                                     verify=False)
+                                     verify=False, timeout=timeout)
             
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
@@ -216,6 +219,12 @@ class Logbook(object):
             for file_like_object in objects_to_close:
                 if hasattr(file_like_object, 'close'):
                     file_like_object.close()
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             # Check if message on server.
@@ -230,7 +239,7 @@ class Logbook(object):
             raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
         return resp_msg_id
 
-    def read(self, msg_id):
+    def read(self, msg_id, timeout=None):
         """
         Reads message from the logbook server and returns tuple of (message, attributes, attachments) where:
         message: string with message body
@@ -238,6 +247,7 @@ class Logbook(object):
         attachments: list of urls to attachments on the logbook server
 
         :param msg_id: ID of the message to be read
+        :param timeout: The timeout value to be passed to the get request.
         :return: message, attributes, attachments
         """
 
@@ -248,10 +258,20 @@ class Logbook(object):
         try:
             self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
             response = requests.get(self._url + str(msg_id) + '?cmd=download', headers=request_headers,
-                                    allow_redirects=False, verify=False)
+                                    allow_redirects=False, verify=False, timeout=timeout)
 
             # Validate response. If problems Exception will be thrown.
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
+
+
+        except requests.Timeout as e:
+
+            # Catch here a timeout o the post request.
+
+            # Raise the logbook excetion and let the user handle it
+
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -284,12 +304,13 @@ class Logbook(object):
 
         return message, attributes, attachments
 
-    def delete(self, msg_id):
+    def delete(self, msg_id, timeout=None):
         """
         Deletes message thread (!!!message + all replies!!!) from logbook.
         It also deletes all of attachments of corresponding messages from the server.
 
         :param msg_id: message to be deleted
+        :param timeout: timeout value to be passed to the get request
         :return:
         """
 
@@ -301,9 +322,15 @@ class Logbook(object):
             self._check_if_message_on_server(msg_id)  # check if something to delete
 
             response = requests.get(self._url + str(msg_id) + '?cmd=Delete&confirm=Yes', headers=request_headers,
-                                    allow_redirects=False, verify=False)
+                                    allow_redirects=False, verify=False, timeout=timeout)
 
             _validate_response(response)  # raises exception if any other error identified
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -316,9 +343,11 @@ class Logbook(object):
         if response.status_code == 200:
             raise LogbookServerProblem('Cannot process delete command (only logbooks in English supported).')
 
-    def search(self, search_term, n_results=20, scope="subtext"):
+    def search(self, search_term, n_results=20, scope="subtext", timeout=None):
         """
         Searches the logbook and returns the message ids.
+
+        :param timeout: timeout value to be passed to the get request
 
         """
         request_headers = dict()
@@ -347,11 +376,17 @@ class Logbook(object):
 
         try:
             response = requests.get(self._url, params=params, headers=request_headers,
-                                    allow_redirects=False, verify=False)
+                                    allow_redirects=False, verify=False, timeout=timeout)
 
             # Validate response. If problems Exception will be thrown.
             _validate_response(response)
             resp_message = response
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -364,25 +399,31 @@ class Logbook(object):
         message_ids = [int(m.split("/")[-1]) for m in message_ids]
         return message_ids
 
-    def get_last_message_id(self):
-        ids = self.get_message_ids()
+    def get_last_message_id(self, timeout=None):
+        ids = self.get_message_ids(timeout)
         if len(ids) > 0:
             return ids[0]
         else:
             return None
 
-    def get_message_ids(self):
+    def get_message_ids(self, timeout=None):
         request_headers = dict()
         if self._user or self._password:
             request_headers['Cookie'] = self._make_user_and_pswd_cookie()
 
         try:
             response = requests.get(self._url + 'page', headers=request_headers,
-                                    allow_redirects=False, verify=False)
+                                    allow_redirects=False, verify=False, timeout=timeout)
 
             # Validate response. If problems Exception will be thrown.
             _validate_response(response)
             resp_message = response
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             # If here: message is on server but cannot be downloaded (should never happen)
@@ -395,11 +436,12 @@ class Logbook(object):
         message_ids = [int(m.split("/")[-1]) for m in message_ids]
         return message_ids
 
-    def _check_if_message_on_server(self, msg_id):
+    def _check_if_message_on_server(self, msg_id, timeout=None):
         """Try to load page for specific message. If there is a htm tag like <td class="errormsg"> then there is no
         such message.
 
         :param msg_id: ID of message to be checked
+        :params timeout: The value of timeout to be passed to the get request
         :return:
         """
 
@@ -408,7 +450,7 @@ class Logbook(object):
             request_headers['Cookie'] = self._make_user_and_pswd_cookie()
         try:
             response = requests.get(self._url + str(msg_id), headers=request_headers, allow_redirects=False,
-                                    verify=False)
+                                    verify=False, timeout=timeout)
 
             # If there is no message code 200 will be returned (OK) and _validate_response will not recognise it
             # but there will be some error in the html code.
@@ -419,6 +461,12 @@ class Logbook(object):
                           resp_message.decode('utf-8', 'ignore'),
                           flags=re.DOTALL):
                 raise LogbookInvalidMessageID('Message with ID: ' + str(msg_id) + ' does not exist on logbook.')
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
             raise LogbookServerProblem('No response from the logbook server.\nDetails: ' + '{0}'.format(e))
