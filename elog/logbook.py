@@ -149,6 +149,12 @@ class Logbook(object):
         if suppress_email_notification != False:
             attributes["suppress"] = 1
 
+        if attachments:
+            files_to_attach, objects_to_close = self._prepare_attachments(attachments)
+        else:
+            objects_to_close = list()
+            files_to_attach = list()
+
 
         attributes_to_edit = dict()
         if msg_id:
@@ -167,10 +173,26 @@ class Logbook(object):
                 msg_to_edit, attributes_to_edit, attach_to_edit = self.read(msg_id)
 
                 i = 0
-                for attachment in attach_to_edit:
-                    if attachment:
+                for existing_attachment in attach_to_edit:
+                    if existing_attachment:
+                        # we need to check what is already on the server because we don't want to post twice the same
+                        # attachment
+                        existing_attachment_name = os.path.basename(existing_attachment)[14:]
+                        existing_attachment_content = self.download_attachment(existing_attachment, timeout=timeout)
+                        is_already_on_server = False
+                        for new_attachment in files_to_attach:
+                            new_attachment_name = new_attachment[1][0]
+                            new_attachment_content = new_attachment[1][1].read()
+                            if existing_attachment_name == new_attachment_name and existing_attachment_content == new_attachment_content:
+                                is_already_on_server = True
+                                #######
+                                break
+
+
+
+
                         # Existing attachments must be passed as regular arguments attachment<i> with value= file name
-                        # Read message returnes full urls to existing attachments:
+                        # Read message returns full urls to existing attachments:
                         # <hostname>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
                         attributes['attachment' + str(i)] = os.path.basename(attachment)
                         i += 1
@@ -189,11 +211,7 @@ class Logbook(object):
         # Remove any attributes that should not be sent
         _remove_reserved_attributes(attributes_to_edit)
 
-        if attachments:
-            files_to_attach, objects_to_close = self._prepare_attachments(attachments)
-        else:
-            objects_to_close = list()
-            files_to_attach = list()
+
 
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
         # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
@@ -436,8 +454,29 @@ class Logbook(object):
         message_ids = [int(m.split("/")[-1]) for m in message_ids]
         return message_ids
 
+    def download_attachment(self, url, timeout=None):
+
+        request_headers = dict()
+        if self._user or self._password:
+            request_headers['Cookie'] = self._make_user_and_pswd_cookie()
+
+        try:
+            response = requests.get(url, headers=request_headers, allow_redirects=False,
+                                    verify=False, timeout=timeout)
+            # If there is no message code 200 will be returned (OK) and _validate_response will not recognise it
+            # but there will be some error in the html code.
+            resp_message, resp_headers, resp_msg_id = _validate_response(response)
+
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
+
+        return resp_message
+
     def _check_if_message_on_server(self, msg_id, timeout=None):
-        """Try to load page for specific message. If there is a htm tag like <td class="errormsg"> then there is no
+        """Try to load page for specific message. If there is a html tag like <td class="errormsg"> then there is no
         such message.
 
         :param msg_id: ID of message to be checked
@@ -508,7 +547,7 @@ class Logbook(object):
                 filename = attribute_name  # If file like object has no name specified use this one
                 candidate_filename = os.path.basename(file_obj.name)
 
-                if filename:  # use only if not empty string
+                if candidate_filename:  # use only if not empty string
                     filename = candidate_filename
 
             elif isinstance(file_obj, str):
@@ -637,7 +676,7 @@ def _validate_response(response):
                     msg_id = None
 
         if b'form name=form1' in response.content or b'type=password' in response.content:
-            # Not to smart to check this way, but no other indication of this kind of error.
+            # Not too smart to check this way, but no other indication of this kind of error.
             # C client does it the same way
             raise LogbookAuthenticationError('Invalid username or password.')
 
