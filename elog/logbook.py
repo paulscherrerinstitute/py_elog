@@ -149,11 +149,37 @@ class Logbook(object):
         if suppress_email_notification != False:
             attributes["suppress"] = 1
 
+
+        # THE ATTACHMENT STRATEGY WHEN DEALING WITH POST MODIFICATION
+        #
+        # 1. Does the message on the server have already attachments?
+        #    1.1 - We read the message getting the existing attachment list.
+        #    1.2 - Add to the attributes dictionary one line for each attachment like this:
+        #       attributes['attachmentN'] = timestamped_filename_name
+        #
+        # 2. Do we have new attachments?
+        #    2.1 - Those are in the new_attachment_list. This is a list of this type:
+        #       [ ('attfileN', ('filename', fileobject)) ]
+        #    2.2 - We need to loop over all the new attachments:
+        #       2.2.1 - Does a file already on the server with the same name exist?
+        #         2.2.1.1 - No: OK. Then we go ahead with the next attachment.
+        #         2.2.1.2 - Yes:
+        #           2.2.1.2.1 - Are the two files identical?
+        #               2.2.1.2.1.1 - Yes: then we remove this current entry from the new_attachment_list and we leave the one
+        #                      already on server.
+        #               2.2.1.2.1.2 - No:
+        #                  2.2.1.2.1.2.1 - Then the file has been update.
+        #                  2.2.1.2.1.2.2 - We need to remove the file on server first (using special post)
+        #                  2.2.1.2.1.2.3 - We have to remove the old attachment from the attributes dictionary.
+        #
+
         if attachments:
-            files_to_attach, objects_to_close = self._prepare_attachments(attachments)
+            # here we accomplish point 2.1.
+            # new_attachment_list is something like [ ('attfileN', ('filename', fileobject)) ]
+            new_attachment_list, objects_to_close = self._prepare_attachments(attachments)
         else:
             objects_to_close = list()
-            files_to_attach = list()
+            new_attachment_list = list()
 
 
         attributes_to_edit = dict()
@@ -162,45 +188,81 @@ class Logbook(object):
             if reply:
                 # Verify that there is a message on the server, otherwise do not reply to it!
                 self._check_if_message_on_server(msg_id)  # raises exception in case of none existing message
-
                 attributes['reply_to'] = str(msg_id)
-
             else:  # Edit existing
                 attributes['edit_id'] = str(msg_id)
                 attributes['skiplock'] = '1'
 
-                # Handle existing attachments
-                msg_to_edit, attributes_to_edit, attach_to_edit = self.read(msg_id)
-
-                i = 0
-                for existing_attachment in attach_to_edit:
-                    if existing_attachment:
-                        # we need to check what is already on the server because we don't want to post twice the same
-                        # attachment
-                        existing_attachment_name = os.path.basename(existing_attachment)[14:]
-                        existing_attachment_content = self.download_attachment(existing_attachment, timeout=timeout)
-                        is_already_on_server = False
-                        for new_attachment in files_to_attach:
-                            new_attachment_name = new_attachment[1][0]
-                            new_attachment_content = new_attachment[1][1].read()
-                            if existing_attachment_name == new_attachment_name and existing_attachment_content == new_attachment_content:
-                                is_already_on_server = True
-                                #######
-                                break
-
-
-
-
-                        # Existing attachments must be passed as regular arguments attachment<i> with value= file name
-                        # Read message returns full urls to existing attachments:
-                        # <hostname>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
-                        attributes['attachment' + str(i)] = os.path.basename(attachment)
-                        i += 1
+                # here we accomplish point 1.1.
+                # existing_attachments_list is something like:
+                # [ 'https://elog.url.com/logbook/timestamped_filename' ]
+                msg_to_edit, attributes_to_edit, existing_attachments_list = self.read(msg_id)
 
                 for attribute, data in attributes.items():
                     new_data = attributes.get(attribute)
                     if new_data is not None:
                         attributes_to_edit[attribute] = new_data
+
+                i = 0
+                existing_attachments_filename_list = list()
+                for attachment in existing_attachments_list:
+                    # here we accomplish point 1.2. We strip the timestamped_filename from the whole URL.
+                    attributes_to_edit[f'attachment{i}'] = os.path.basename(attachment)
+                    existing_attachments_filename_list.append(os.path.basename(attachment)[14:])
+                    i += 1
+
+                # let's accomplish 2.2. Loop over all new attachment
+                duplicate_attachment_list = list()
+                for new_attachment in new_attachment_list:
+                    # the new_attachment_list is something like:
+                    # [ ('attfileN', ('filename', fileobject)) ]
+                    new_attachment_filename = new_attachment[1][0]
+                    if new_attachment_filename in existing_attachments_filename_list:
+                        # a file with the same name existing already on the server.
+                        # we need to check if the two files are the same.
+                        # read the content of the new file
+                        new_attachment_content = new_attachment[1][1].read()
+                        # don't forget to reset the fileobj to the beginning of the file
+                        new_attachment[1][1].seek(0)
+                        # get the existing attachment content
+                        attachment_index = existing_attachments_filename_list.index(new_attachment_filename)
+                        existing_attachment_content = self.download_attachment(
+                            url=existing_attachments_list[attachment_index],
+                            timeout=timeout
+                        )
+                        # check if the two contents are the same
+                        if new_attachment_content == existing_attachment_content:
+                            # yes. then we don't upload a second copy. we remove the current entry from the list
+                            duplicate_attachment_list.append(new_attachment)
+                        else:
+                            # no. they are not the same file. we will replace the existing file with the new one
+                            # first: we need to remove the attachment from the server using the dedicated method
+                            print(f'{attributes_to_edit=}')
+                            self.delete_attachment(msg_id, attributes=attributes_to_edit,
+                                                   attachment_id=attachment_index,
+                                                   timeout=timeout, text=msg_to_edit)
+                            # now we can remove this attachment from the auxiliary lists.
+                            existing_attachments_filename_list.pop(attachment_index)
+                            existing_attachments_list.pop(attachment_index)
+                            # now we need to rebuild the attributes dictionary for the part concerning the attachments.
+                            # we remove all of them first
+                            keys_to_be_removed = list()
+                            for key in attributes_to_edit.keys():
+                                if key.startswith('attachment'):
+                                    keys_to_be_removed.append(key)
+                                if key.startswith('delatt'):
+                                    keys_to_be_removed.append(key)
+                            for key in keys_to_be_removed:
+                                del attributes_to_edit[key]
+
+                            # now we rebuild it
+                            for i, attachment in enumerate(existing_attachments_list):
+                                attributes_to_edit[f'attachment{i}'] = os.path.basename(attachment)
+
+                # remove all duplicate attachments from the new_attachment_list
+                for attach in duplicate_attachment_list:
+                    new_attachment_list.remove(attach)
+
         else:
             # As we create a new message, specify creation time if not already specified in attributes
             if 'When' not in attributes:
@@ -208,14 +270,13 @@ class Logbook(object):
 
         if not attributes_to_edit:
             attributes_to_edit = attributes
+
         # Remove any attributes that should not be sent
         _remove_reserved_attributes(attributes_to_edit)
 
-
-
         # Make requests module think that Text is a "file". This is the only way to force requests to send data as
         # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
-        files_to_attach.append(('Text', ('', message.encode('iso-8859-1'))))
+        new_attachment_list.append(('Text', ('', message.encode('iso-8859-1'))))
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
@@ -227,9 +288,9 @@ class Logbook(object):
         attributes_to_edit = _encode_values(attributes_to_edit)
 
         try:
-            response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
-                                     verify=False, timeout=timeout)
-            
+            response = requests.post(self._url, data=attributes_to_edit, files=new_attachment_list,
+                                     allow_redirects=False,  verify=False, timeout=timeout)
+
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
 
@@ -321,6 +382,36 @@ class Logbook(object):
                 attributes[line[0]] = data
 
         return message, attributes, attachments
+
+    def delete_attachment(self, msg_id, text, attributes, attachment_id, timeout=None):
+
+        attributes[f'delatt{attachment_id}'] = 'Delete'
+        attributes['cmd'] = 'Update'
+        attributes['exp'] = self.logbook
+        if self._user:
+            attributes['unm'] = self._user
+        if self._password:
+            attributes['upwd'] = self._password
+
+        just_text = list()
+        just_text.append(('Text', ('', text.encode('iso-8859-1'))))
+        try:
+            response = requests.post(self._url, data=attributes, verify=False, allow_redirects=False,
+                                     files=just_text)
+        except requests.Timeout as e:
+            # Catch here a timeout o the post request.
+            # Raise the logbook excetion and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
+                                       '{1}'.format(sys._getframe().f_code.co_name, e))
+        except requests.RequestException as e:
+            # Check if message on server.
+            self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
+
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to post a message, ' + 'because of:\n' +
+                                       '{0}'.format(e))
+        finally:
+            del attributes[f'delatt{attachment_id}']
 
     def delete(self, msg_id, timeout=None):
         """
@@ -468,7 +559,7 @@ class Logbook(object):
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
 
         except requests.Timeout as e:
-            # Catch here a timeout o the post request.
+            # Catch here a timeout of the get request.
             # Raise the logbook excetion and let the user handle it
             raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
@@ -523,7 +614,7 @@ class Logbook(object):
         if self._password:
             data['upwd'] = self._password
 
-    def _prepare_attachments(self, files):
+    def _prepare_attachments2(self, files):
         """
         Parses attachments to content objects. Attachments can be:
             - file like objects: must have method read() which returns bytes. If it has attribute .name it will be used
@@ -576,6 +667,62 @@ class Logbook(object):
 
         return prepared, objects_to_close
 
+    def _prepare_attachments(self, files):
+        """
+        Parses attachments to content objects. Attachments can be:
+            - file like objects: must have method read() which returns bytes. If it has attribute .name it will be used
+              for attachment name, otherwise generic attribute<i> name will be used.
+            - path to the file on disk
+
+        Note that if attachment is is an url pointing to the existing Logbook server it will be ignored and no
+        exceptions will be raised. This can happen if attachments returned with read_method are resend.
+
+        :param files: list of file like objects or paths
+        :return: content string
+        """
+        prepared = list()
+        i = 0
+        objects_to_close = list()  # objects that are created (opened) by elog must be later closed
+        for file_obj in files:
+            if hasattr(file_obj, 'read'):
+                attribute_name = 'attachment' + str(i)
+                filename = attribute_name  # If file like object has no name specified use this one
+                candidate_filename = os.path.basename(file_obj.name)
+
+                if candidate_filename:  # use only if not empty string
+                    filename = candidate_filename
+                i += 1
+
+
+            elif isinstance(file_obj, str):
+                # Check if it is:
+                #           - a path to the file --> open file and append
+                #           - an url pointing to the existing Logbook server --> ignore
+
+                filename = ""
+                attribute_name = ""
+
+                if os.path.isfile(file_obj):
+
+                    attribute_name = 'attfile' + str(i)
+
+                    file_obj = builtins.open(file_obj, 'rb')
+                    filename = os.path.basename(file_obj.name)
+
+                    objects_to_close.append(file_obj)
+                    i += 1
+
+                elif not file_obj.startswith(self._url):
+                    raise LogbookInvalidAttachmentType('Invalid type of attachment: \"' + file_obj + '\".')
+            else:
+                raise LogbookInvalidAttachmentType('Invalid type of attachment[' + str(i) + '].')
+
+            # prepared.append((attribute_name, (filename, file_obj)))
+            prepared.append((attribute_name,  (filename, file_obj)))
+
+        return prepared, objects_to_close
+
+
     def _make_user_and_pswd_cookie(self):
         """
         prepares user name and password cookie. It is sent in header when posting a message.
@@ -589,6 +736,127 @@ class Logbook(object):
 
         return cookie
 
+    def post2(self, message, msg_id=None, reply=False, attributes=None, attachments=None,
+             suppress_email_notification=False, encoding=None, **kwargs):
+        """
+        Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
+        message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
+        of the newly created message.
+        :param message: string with message text
+        :param msg_id: ID number of message to edit or reply. If not specified new message is created.
+        :param reply: If 'True' reply to existing message is created instead of editing it
+        :param attributes: Dictionary of attributes. Following attributes are used internally by the elog and will be
+                           ignored: Text, Date, Encoding, Reply to, In reply to, Locked by, Attachment
+        :param attachments: list of:
+                                  - file like objects which read() will return bytes (if file_like_object.name is not
+                                    defined, default name "attachment<i>" will be used.
+                                  - paths to the files
+                            All items will be appended as attachment to the elog entry. In case of unknown
+                            attachment an exception LogbookInvalidAttachment will be raised.
+        :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
+                         'ELCode' --> elog formatting syntax
+        :param suppress_email_notification: If set to True or 1, E-Mail notification will be suppressed, defaults to False.
+        :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post('Test text',
+                       Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
+                       attributes defined in "attributes", kwargs will have priority.
+        :return: msg_id
+        """
+
+        attributes = attributes or {}
+        attributes = {**attributes, **kwargs}  # kwargs as attributes with higher priority
+
+        attachments = attachments or []
+
+        if encoding is not None:
+            if encoding not in ['plain', 'HTML', 'ELCode']:
+                raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
+            attributes['Encoding'] = encoding
+
+        if suppress_email_notification != False:
+            attributes["suppress"] = 1
+
+        attributes_to_edit = dict()
+        if msg_id:
+            # Message exists, we can continue
+            if reply:
+                # Verify that there is a message on the server, otherwise do not reply to it!
+                self._check_if_message_on_server(msg_id)  # raises exception in case of none existing message
+
+                attributes['reply_to'] = str(msg_id)
+
+            else:  # Edit existing
+                attributes['edit_id'] = str(msg_id)
+                attributes['skiplock'] = '1'
+
+                # Handle existing attachments
+                msg_to_edit, attributes_to_edit, attach_to_edit = self.read(msg_id)
+
+                i = 0
+                for attachment in attach_to_edit:
+                    if attachment:
+                        # Existing attachments must be passed as regular arguments attachment<i> with value= file name
+                        # Read message returnes full urls to existing attachments:
+                        # <hostname>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
+                        attributes['attachment' + str(i)] = os.path.basename(attachment)
+                        i += 1
+
+                for attribute, data in attributes.items():
+                    new_data = attributes.get(attribute)
+                    if new_data is not None:
+                        attributes_to_edit[attribute] = new_data
+        else:
+            # As we create a new message, specify creation time if not already specified in attributes
+            if 'When' not in attributes:
+                attributes['When'] = int(datetime.now().timestamp())
+
+        if not attributes_to_edit:
+            attributes_to_edit = attributes
+        # Remove any attributes that should not be sent
+        _remove_reserved_attributes(attributes_to_edit)
+
+        if attachments:
+            files_to_attach, objects_to_close = self._prepare_attachments2(attachments)
+        else:
+            objects_to_close = list()
+            files_to_attach = list()
+
+        # Make requests module think that Text is a "file". This is the only way to force requests to send data as
+        # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
+        files_to_attach.append(('Text', ('', message.encode('iso-8859-1'))))
+
+        # Base attributes are common to all messages
+        self._add_base_msg_attributes(attributes_to_edit)
+
+        # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
+        attributes_to_edit = _replace_special_characters_in_attribute_keys(attributes_to_edit)
+
+        # All string values in the attributes must be encoded in latin1
+        attributes_to_edit = _encode_values(attributes_to_edit)
+
+        try:
+            response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
+                                     verify=False)
+
+            # Validate response. Any problems will raise an Exception.
+            resp_message, resp_headers, resp_msg_id = _validate_response(response)
+
+            # Close file like objects that were opened by the elog (if  path
+            for file_like_object in objects_to_close:
+                if hasattr(file_like_object, 'close'):
+                    file_like_object.close()
+
+        except requests.RequestException as e:
+            # Check if message on server.
+            self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
+
+            # If here: message is on server but cannot be downloaded (should never happen)
+            raise LogbookServerProblem('Cannot access logbook server to post a message, ' + 'because of:\n' +
+                                       '{0}'.format(e))
+
+        # Any error before here should raise an exception, but check again for nay case.
+        if not resp_msg_id or resp_msg_id < 1:
+            raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
+        return resp_msg_id
 
 def _remove_reserved_attributes(attributes):
     """
@@ -646,6 +914,7 @@ def _validate_response(response):
                          response.content.decode('utf-8', 'ignore'),
                          flags=re.DOTALL)
 
+
         if len(err) > 0:
             # Remove html tags
             # If part of the message has: Please go  back... remove this part since it is an instruction for
@@ -675,7 +944,7 @@ def _validate_response(response):
                     # this may happen when deleting the last entry of a logbook
                     msg_id = None
 
-        if b'form name=form1' in response.content or b'type=password' in response.content:
+        if b'type=password' in response.content:
             # Not too smart to check this way, but no other indication of this kind of error.
             # C client does it the same way
             raise LogbookAuthenticationError('Invalid username or password.')
