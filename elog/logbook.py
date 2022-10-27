@@ -32,7 +32,7 @@ class Logbook(object):
         :return:
         """
         hostname = hostname.strip()
-        
+
         # parse url to see if some parameters are defined with url
         parsed_url = urllib.parse.urlsplit(hostname)
 
@@ -57,7 +57,7 @@ class Logbook(object):
         # 1) by default use port defined in the url
         # 2) remove any 'default' ports such as 80 for http and 443 for https
         # 3) if port not defined in url and not 'default' add it to netloc
-        
+
         netloc = parsed_url.netloc
         if netloc == "" and "localhost" in hostname:
             netloc = 'localhost'
@@ -92,7 +92,7 @@ class Logbook(object):
                 url_path += '/{}'.format(logbook)
             else:
                 logbook = splitted_path[-1]
-            
+
         else:
             # There is nothing. Use arguments.
             url_path = subdir + '/' + logbook
@@ -100,7 +100,7 @@ class Logbook(object):
         # urllib.parse.quote replaces special characters with %xx escapes
         # self._logbook_path = urllib.parse.quote('/' + url_path + '/').replace('//', '/')
         self._logbook_path = ('/' + url_path + '/').replace('//', '/')
-        
+
         self._url = url_scheme + '://' + netloc + self._logbook_path
         self.logbook = logbook
         self._user = user
@@ -146,9 +146,8 @@ class Logbook(object):
                 raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
             attributes['Encoding'] = encoding
 
-        if suppress_email_notification != False:
+        if suppress_email_notification:
             attributes["suppress"] = 1
-
 
         # THE ATTACHMENT STRATEGY WHEN DEALING WITH POST MODIFICATION
         #
@@ -180,7 +179,6 @@ class Logbook(object):
         else:
             objects_to_close = list()
             new_attachment_list = list()
-
 
         attributes_to_edit = dict()
         if msg_id:
@@ -237,7 +235,6 @@ class Logbook(object):
                         else:
                             # no. they are not the same file. we will replace the existing file with the new one
                             # first: we need to remove the attachment from the server using the dedicated method
-                            print(f'{attributes_to_edit=}')
                             self.delete_attachment(msg_id, attributes=attributes_to_edit,
                                                    attachment_id=attachment_index,
                                                    timeout=timeout, text=msg_to_edit)
@@ -280,16 +277,16 @@ class Logbook(object):
 
         # Base attributes are common to all messages
         self._add_base_msg_attributes(attributes_to_edit)
-        
+
         # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
         attributes_to_edit = _replace_special_characters_in_attribute_keys(attributes_to_edit)
-        
+
         # All string values in the attributes must be encoded in latin1
         attributes_to_edit = _encode_values(attributes_to_edit)
 
         try:
             response = requests.post(self._url, data=attributes_to_edit, files=new_attachment_list,
-                                     allow_redirects=False,  verify=False, timeout=timeout)
+                                     allow_redirects=False, verify=False, timeout=timeout)
 
             # Validate response. Any problems will raise an Exception.
             resp_message, resp_headers, resp_msg_id = _validate_response(response)
@@ -302,7 +299,7 @@ class Logbook(object):
         except requests.Timeout as e:
             # Catch here a timeout o the post request.
             # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
@@ -438,7 +435,7 @@ class Logbook(object):
         except requests.Timeout as e:
             # Catch here a timeout o the post request.
             # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
@@ -475,7 +472,7 @@ class Logbook(object):
             params.update(search_term)
         else:
             params.update({scope: search_term})
-            
+
         # Remove empty entries from params, since ELog will redirect such requests
         # and remove them anyway, but the redirect leads to unexpected results
         keys = list(params.keys())
@@ -494,7 +491,7 @@ class Logbook(object):
         except requests.Timeout as e:
             # Catch here a timeout o the post request.
             # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
@@ -530,8 +527,8 @@ class Logbook(object):
 
         except requests.Timeout as e:
             # Catch here a timeout o the post request.
-            # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            # Raise the logbook exception and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
@@ -546,7 +543,9 @@ class Logbook(object):
         return message_ids
 
     def download_attachment(self, url, timeout=None):
-
+        """
+        Download an attachment from the specified url.
+        """
         request_headers = dict()
         if self._user or self._password:
             request_headers['Cookie'] = self._make_user_and_pswd_cookie()
@@ -560,8 +559,8 @@ class Logbook(object):
 
         except requests.Timeout as e:
             # Catch here a timeout of the get request.
-            # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            # Raise the logbook exception and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         return resp_message
@@ -594,8 +593,8 @@ class Logbook(object):
 
         except requests.Timeout as e:
             # Catch here a timeout o the post request.
-            # Raise the logbook excetion and let the user handle it
-            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n'+
+            # Raise the logbook exception and let the user handle it
+            raise LogbookServerTimeout('{0} method cannot be completed because of a network timeout:\n' +
                                        '{1}'.format(sys._getframe().f_code.co_name, e))
 
         except requests.RequestException as e:
@@ -614,59 +613,6 @@ class Logbook(object):
         if self._password:
             data['upwd'] = self._password
 
-    def _prepare_attachments2(self, files):
-        """
-        Parses attachments to content objects. Attachments can be:
-            - file like objects: must have method read() which returns bytes. If it has attribute .name it will be used
-              for attachment name, otherwise generic attribute<i> name will be used.
-            - path to the file on disk
-
-        Note that if attachment is is an url pointing to the existing Logbook server it will be ignored and no
-        exceptions will be raised. This can happen if attachments returned with read_method are resend.
-
-        :param files: list of file like objects or paths
-        :return: content string
-        """
-        prepared = list()
-        i = 0
-        objects_to_close = list()  # objects that are created (opened) by elog must be later closed
-        for file_obj in files:
-            if hasattr(file_obj, 'read'):
-                i += 1
-                attribute_name = 'attfile' + str(i)
-
-                filename = attribute_name  # If file like object has no name specified use this one
-                candidate_filename = os.path.basename(file_obj.name)
-
-                if candidate_filename:  # use only if not empty string
-                    filename = candidate_filename
-
-            elif isinstance(file_obj, str):
-                # Check if it is:
-                #           - a path to the file --> open file and append
-                #           - an url pointing to the existing Logbook server --> ignore
-
-                filename = ""
-                attribute_name = ""
-
-                if os.path.isfile(file_obj):
-                    i += 1
-                    attribute_name = 'attfile' + str(i)
-
-                    file_obj = builtins.open(file_obj, 'rb')
-                    filename = os.path.basename(file_obj.name)
-
-                    objects_to_close.append(file_obj)
-
-                elif not file_obj.startswith(self._url):
-                    raise LogbookInvalidAttachmentType('Invalid type of attachment: \"' + file_obj + '\".')
-            else:
-                raise LogbookInvalidAttachmentType('Invalid type of attachment[' + str(i) + '].')
-
-            prepared.append((attribute_name, (filename, file_obj)))
-
-        return prepared, objects_to_close
-
     def _prepare_attachments(self, files):
         """
         Parses attachments to content objects. Attachments can be:
@@ -674,25 +620,29 @@ class Logbook(object):
               for attachment name, otherwise generic attribute<i> name will be used.
             - path to the file on disk
 
-        Note that if attachment is is an url pointing to the existing Logbook server it will be ignored and no
+        Note that if attachment is an url pointing to the existing Logbook server it will be ignored and no
         exceptions will be raised. This can happen if attachments returned with read_method are resend.
 
         :param files: list of file like objects or paths
-        :return: content string
+        :return: two lists:
+            - one list of prepared attachment in the form of
+                [ ('attfileN', ('filename', file_object)) ]
+
+            - one list of object to be closed. all files that are passed as string or path are opened by the library
+                and need to be closed by the library.
         """
         prepared = list()
         i = 0
         objects_to_close = list()  # objects that are created (opened) by elog must be later closed
         for file_obj in files:
             if hasattr(file_obj, 'read'):
-                attribute_name = 'attachment' + str(i)
+                attribute_name = f'attfile{i}'
                 filename = attribute_name  # If file like object has no name specified use this one
                 candidate_filename = os.path.basename(file_obj.name)
 
                 if candidate_filename:  # use only if not empty string
                     filename = candidate_filename
                 i += 1
-
 
             elif isinstance(file_obj, str):
                 # Check if it is:
@@ -704,8 +654,7 @@ class Logbook(object):
 
                 if os.path.isfile(file_obj):
 
-                    attribute_name = 'attfile' + str(i)
-
+                    attribute_name = f'attfile{i}'
                     file_obj = builtins.open(file_obj, 'rb')
                     filename = os.path.basename(file_obj.name)
 
@@ -718,10 +667,9 @@ class Logbook(object):
                 raise LogbookInvalidAttachmentType('Invalid type of attachment[' + str(i) + '].')
 
             # prepared.append((attribute_name, (filename, file_obj)))
-            prepared.append((attribute_name,  (filename, file_obj)))
+            prepared.append((attribute_name, (filename, file_obj)))
 
         return prepared, objects_to_close
-
 
     def _make_user_and_pswd_cookie(self):
         """
@@ -736,127 +684,6 @@ class Logbook(object):
 
         return cookie
 
-    def post2(self, message, msg_id=None, reply=False, attributes=None, attachments=None,
-             suppress_email_notification=False, encoding=None, **kwargs):
-        """
-        Posts message to the logbook. If msg_id is not specified new message will be created, otherwise existing
-        message will be edited, or a reply (if reply=True) to it will be created. This method returns the msg_id
-        of the newly created message.
-        :param message: string with message text
-        :param msg_id: ID number of message to edit or reply. If not specified new message is created.
-        :param reply: If 'True' reply to existing message is created instead of editing it
-        :param attributes: Dictionary of attributes. Following attributes are used internally by the elog and will be
-                           ignored: Text, Date, Encoding, Reply to, In reply to, Locked by, Attachment
-        :param attachments: list of:
-                                  - file like objects which read() will return bytes (if file_like_object.name is not
-                                    defined, default name "attachment<i>" will be used.
-                                  - paths to the files
-                            All items will be appended as attachment to the elog entry. In case of unknown
-                            attachment an exception LogbookInvalidAttachment will be raised.
-        :param encoding: Defines encoding of the message. Can be: 'plain' -> plain text, 'html'->html-text,
-                         'ELCode' --> elog formatting syntax
-        :param suppress_email_notification: If set to True or 1, E-Mail notification will be suppressed, defaults to False.
-        :param kwargs: Anything in the kwargs will be interpreted as attribute. e.g.: logbook.post('Test text',
-                       Author='Rok Vintar), "Author" will be sent as an attribute. If named same as one of the
-                       attributes defined in "attributes", kwargs will have priority.
-        :return: msg_id
-        """
-
-        attributes = attributes or {}
-        attributes = {**attributes, **kwargs}  # kwargs as attributes with higher priority
-
-        attachments = attachments or []
-
-        if encoding is not None:
-            if encoding not in ['plain', 'HTML', 'ELCode']:
-                raise LogbookMessageRejected('Invalid message encoding. Valid options: plain, HTML, ELCode.')
-            attributes['Encoding'] = encoding
-
-        if suppress_email_notification != False:
-            attributes["suppress"] = 1
-
-        attributes_to_edit = dict()
-        if msg_id:
-            # Message exists, we can continue
-            if reply:
-                # Verify that there is a message on the server, otherwise do not reply to it!
-                self._check_if_message_on_server(msg_id)  # raises exception in case of none existing message
-
-                attributes['reply_to'] = str(msg_id)
-
-            else:  # Edit existing
-                attributes['edit_id'] = str(msg_id)
-                attributes['skiplock'] = '1'
-
-                # Handle existing attachments
-                msg_to_edit, attributes_to_edit, attach_to_edit = self.read(msg_id)
-
-                i = 0
-                for attachment in attach_to_edit:
-                    if attachment:
-                        # Existing attachments must be passed as regular arguments attachment<i> with value= file name
-                        # Read message returnes full urls to existing attachments:
-                        # <hostname>:[<port>][/<subdir]/<logbook>/<msg_id>/<file_name>
-                        attributes['attachment' + str(i)] = os.path.basename(attachment)
-                        i += 1
-
-                for attribute, data in attributes.items():
-                    new_data = attributes.get(attribute)
-                    if new_data is not None:
-                        attributes_to_edit[attribute] = new_data
-        else:
-            # As we create a new message, specify creation time if not already specified in attributes
-            if 'When' not in attributes:
-                attributes['When'] = int(datetime.now().timestamp())
-
-        if not attributes_to_edit:
-            attributes_to_edit = attributes
-        # Remove any attributes that should not be sent
-        _remove_reserved_attributes(attributes_to_edit)
-
-        if attachments:
-            files_to_attach, objects_to_close = self._prepare_attachments2(attachments)
-        else:
-            objects_to_close = list()
-            files_to_attach = list()
-
-        # Make requests module think that Text is a "file". This is the only way to force requests to send data as
-        # multipart/form-data even if there are no attachments. Elog understands only multipart/form-data
-        files_to_attach.append(('Text', ('', message.encode('iso-8859-1'))))
-
-        # Base attributes are common to all messages
-        self._add_base_msg_attributes(attributes_to_edit)
-
-        # Keys in attributes cannot have certain characters like whitespaces or dashes for the http request
-        attributes_to_edit = _replace_special_characters_in_attribute_keys(attributes_to_edit)
-
-        # All string values in the attributes must be encoded in latin1
-        attributes_to_edit = _encode_values(attributes_to_edit)
-
-        try:
-            response = requests.post(self._url, data=attributes_to_edit, files=files_to_attach, allow_redirects=False,
-                                     verify=False)
-
-            # Validate response. Any problems will raise an Exception.
-            resp_message, resp_headers, resp_msg_id = _validate_response(response)
-
-            # Close file like objects that were opened by the elog (if  path
-            for file_like_object in objects_to_close:
-                if hasattr(file_like_object, 'close'):
-                    file_like_object.close()
-
-        except requests.RequestException as e:
-            # Check if message on server.
-            self._check_if_message_on_server(msg_id)  # raises exceptions if no message or no response from server
-
-            # If here: message is on server but cannot be downloaded (should never happen)
-            raise LogbookServerProblem('Cannot access logbook server to post a message, ' + 'because of:\n' +
-                                       '{0}'.format(e))
-
-        # Any error before here should raise an exception, but check again for nay case.
-        if not resp_msg_id or resp_msg_id < 1:
-            raise LogbookInvalidMessageID('Invalid message ID: ' + str(resp_msg_id) + ' returned')
-        return resp_msg_id
 
 def _remove_reserved_attributes(attributes):
     """
@@ -871,6 +698,7 @@ def _remove_reserved_attributes(attributes):
         attributes.pop('Date', None)
         attributes.pop('Attachment', None)
         attributes.pop('Text', None)  # Remove this one because it will be send attachment like
+
 
 def _encode_values(attributes):
     """
@@ -913,7 +741,6 @@ def _validate_response(response):
         err = re.findall('<td.*?class="errormsg".*?>.*?</td>',
                          response.content.decode('utf-8', 'ignore'),
                          flags=re.DOTALL)
-
 
         if len(err) > 0:
             # Remove html tags
