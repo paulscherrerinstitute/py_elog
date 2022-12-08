@@ -638,7 +638,7 @@ class Logbook(object):
             if hasattr(file_obj, 'read'):
                 attribute_name = f'attfile{i}'
                 filename = attribute_name  # If file like object has no name specified use this one
-                candidate_filename = os.path.basename(file_obj.name)
+                candidate_filename = os.path.basename(file_obj.name).replace(' ', '_')
 
                 if candidate_filename:  # use only if not empty string
                     filename = candidate_filename
@@ -656,7 +656,7 @@ class Logbook(object):
 
                     attribute_name = f'attfile{i}'
                     file_obj = builtins.open(file_obj, 'rb')
-                    filename = os.path.basename(file_obj.name)
+                    filename = os.path.basename(file_obj.name).replace(' ', '_')
 
                     objects_to_close.append(file_obj)
                     i += 1
