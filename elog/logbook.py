@@ -789,7 +789,7 @@ def _handle_pswd(password, encrypt=True):
     :param encrypt: encrypt password?
     :return: elog prepared password
     """
-    if encrypt and password:
+    if encrypt and password is not None:
         from passlib.hash import sha256_crypt
         return sha256_crypt.using(salt='', rounds=5000).hash(password)[4:]
     elif password and password.startswith('$5$$'):
