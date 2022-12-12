@@ -8,7 +8,7 @@ README = open(os.path.join(here, "README.md")).read()
 
 setup(
     name="py_elog",
-    version="1.3.15",
+    version="1.3.16",
     description="Python library to access Elog.",
     long_description=README,
     long_description_content_type="text/markdown",
