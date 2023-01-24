@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["elog"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/.pytest_cache",
+  "/dist"
+]
+
+[project]
+name = "py_elog"
+version = "1.3.16"
+authors = [
+  { name = "Paul Scherrer Institute" },
+]
+dependencies = [
+  'requests',
+  'passlib',
+  'lxml'
+]
+description = "Python library to access Elog."
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+requires-python = ">=3"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/paulscherrerinstitute/py_elog"
