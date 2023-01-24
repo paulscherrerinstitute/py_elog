@@ -684,6 +684,78 @@ class Logbook(object):
 
         return cookie
 
+    def get_parent(self, msg_id, timeout=None):
+        """
+        :return: the message id of the message specify by msg_id
+        """
+        message, attributes, attachments = self.read(msg_id, timeout=timeout)
+        parent_id = attributes.get('In reply to', None)
+        if parent_id:
+            return int(parent_id)
+        else:
+            return None
+
+    @staticmethod
+    def from_string_to_list(children_string):
+        """
+        :return: a list of children starting from a comma separated string of numbers
+        """
+        return [int(child) for child in children_string.split(',')]
+
+    def get_children(self, msg_id, timeout=None):
+        """
+        :return: a list of children of a message. The list could be empty if the message has no children.
+        """
+        m, attributes, a = self.read(msg_id, timeout=timeout)
+        children_str = attributes.get('Reply to', None)
+        if children_str is None:
+            return []
+        else:
+            return self.from_string_to_list(children_str)
+
+    def get_descendants(self, msg_id, timeout=None):
+        """
+        :return: a list with all children of a message recursively.
+                The list could be empty if the message has no descendant.
+        """
+        all_children = []
+        children = self.get_children(msg_id, timeout)
+        for child in children:
+            all_children.append(child)
+            self._recursive_loop(all_children, child, timeout)
+        return all_children
+
+
+    def get_siblings(self, msg_id, timeout=None):
+        """
+        :return: the list of siblings of the message specified by msg_id
+        """
+        parent_id = self.get_parent(msg_id, timeout=None)
+        if parent_id is None:
+            return None
+        return self.get_children(parent_id, timeout)
+
+
+    def _recursive_loop(self, cumulative_list, current_child, timeout=None):
+        """
+        Helper function to perform recursive loops
+        """
+        children = self.get_children(current_child, timeout)
+        for child in children:
+            cumulative_list.append(child)
+            self._recursive_loop(cumulative_list, child, timeout)
+
+    def get_ancestors(self, msg_id, timeout=None):
+        """
+        :return: the list of all predecessors up to the first element in the series. The list could be empty if the
+        message correspoonding to msg_id is already the first element in the series.
+        """
+        anchestors = []
+        parent_id = self.get_parent(msg_id, timeout)
+        while parent_id is not None:
+            anchestors.append(parent_id)
+            parent_id = self.get_parent(parent_id, timeout)
+        return anchestors
 
 def _remove_reserved_attributes(attributes):
     """

@@ -1,5 +1,4 @@
 import unittest
-# import logging
 import elog
 from elog.logbook_exceptions import *
 
@@ -66,7 +65,75 @@ class TestClass(unittest.TestCase):
         whole_test = attr_ok and mess_ok
         
         self.assertTrue(whole_test)
-        
+
+    def test_hierarchy_navigation(self):
+
+        # first generate the hierarchical tree
+        logbook = elog.open(self.elog_hostname)
+        anchestors = []
+        descendants = []
+        siblings = []
+
+        attributes = {'Author': 'py_elog',
+                      'Type': 'Other',
+                      'Category': 'General',
+                      'Subject':'Top level'}
+        message = 'Hierarchical navigation test performed by the py_elog suite'
+        top_level = logbook.post(message, reply=False, attributes=attributes, encoding='HTML')
+
+        attributes['Subject'] ='Sub level 1.1'
+        sublevel1_1 = logbook.post(message, reply=True, msg_id=top_level, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel1_1)
+        siblings.append(sublevel1_1)
+
+        attributes['Subject'] ='Sub level 1.2'
+        sublevel1_2 = logbook.post(message, reply=True, msg_id=top_level, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel1_2)
+        siblings.append(sublevel1_2)
+
+        attributes['Subject'] ='Sub level 1.3'
+        sublevel1_3 = logbook.post(message, reply=True, msg_id=top_level, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel1_3)
+        siblings.append(sublevel1_3)
+
+        attributes['Subject'] ='Sub level 2.1'
+        sublevel2_1 = logbook.post(message, reply=True, msg_id=sublevel1_1, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel2_1)
+
+        attributes['Subject'] ='Sub level 2.2'
+        sublevel2_2 = logbook.post(message, reply=True, msg_id=sublevel1_2, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel2_2)
+
+        attributes['Subject'] ='Sub level 2.3'
+        sublevel2_3 = logbook.post(message, reply=True, msg_id=sublevel1_3, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel2_3)
+
+        attributes['Subject'] = 'Sub level 3.1'
+        sublevel3_1 = logbook.post(message, reply=True, msg_id=sublevel2_1, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel3_1)
+
+        attributes['Subject'] = 'Sub level 3.2'
+        sublevel3_2 = logbook.post(message, reply=True, msg_id=sublevel2_2, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel3_2)
+
+        attributes['Subject'] = 'Sub level 3.3'
+        sublevel3_3 = logbook.post(message, reply=True, msg_id=sublevel2_3, attributes=attributes, encoding='HTML')
+        descendants.append(sublevel3_3)
+
+        anchestors.append(sublevel2_3)
+        anchestors.append(sublevel1_3)
+        anchestors.append(top_level)
+
+
+        test_descendants = logbook.get_descendants(top_level)
+        test_anchestors = logbook.get_ancestors(sublevel3_3)
+        test_siblings = logbook.get_siblings(sublevel1_1)
+
+        self.assertEqual(test_descendants.sort(), descendants.sort())
+        self.assertEqual(test_anchestors, anchestors)
+        self.assertEqual(test_siblings, siblings)
+
+
 if __name__ == '__main__':
     unittest.main()
     
