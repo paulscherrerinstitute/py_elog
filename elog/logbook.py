@@ -410,10 +410,18 @@ class Logbook(object):
         finally:
             del attributes[f'delatt{attachment_id}']
 
+    def delete_all_attachments(self, msg_id, timeout=None):
+
+        message, attributes, attachments = self.read(msg_id, timeout)
+        n_attach = len(attachments)
+        for attachment_id in range(n_attach):
+            self.delete_attachment(msg_id, message, attributes, attachment_id, timeout)
+
+
     def delete(self, msg_id, timeout=None):
         """
         Deletes message thread (!!!message + all replies!!!) from logbook.
-        It also deletes all of attachments of corresponding messages from the server.
+        It also deletes all attachments of corresponding messages from the server.
 
         :param msg_id: message to be deleted
         :param timeout: timeout value to be passed to the get request
@@ -843,7 +851,7 @@ def _validate_response(response):
                     # this may happen when deleting the last entry of a logbook
                     msg_id = None
 
-        if b'type=password' in response.content:
+        if b'type=password' in response.content or b'type="password"' in response.content:
             # Not too smart to check this way, but no other indication of this kind of error.
             # C client does it the same way
             raise LogbookAuthenticationError('Invalid username or password.')
