@@ -107,6 +107,19 @@ logbook.delete(23)
 
 __Note:__ Due to the way elog implements delete this function is only supported on english logbooks.
 
+### JWT-based authentication
+If the access to the elog is protected by an OAuth2 layer, it is possible to add the token (or a callable returning
+the token) when opening the connection to the ELOG server
+
+```python
+logbook = elog.open(
+    'https://elog.example.com', 'my_logbook', user='my_username', bearer_token=open("/path/to/my/token").read()
+)
+```
+
+This includes the Access token in the request headers of the following queries to the ELOG.
+
+
 # Installation
 The Elog module and only depends on the `passlib` and `requests` library used for password encryption and http(s) communication. It is packed as [anaconda package](https://anaconda.org/paulscherrerinstitute/elog) and can be installed as follows:
 
